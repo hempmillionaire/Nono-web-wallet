@@ -84,23 +84,23 @@ const LwsClient = (function () {
     if (MOCK || typeof turnstile === 'undefined') return;
     var el = document.getElementById('turnstile-box');
     if (!el) return;
+    console.log('[lws] Turnstile rendering...');
     turnstile.render(el, {
       sitekey: TURNSTILE_SITE_KEY,
       callback: function (token) {
+        console.log('[lws] Turnstile token received');
         _turnstileToken = token;
         _turnstileReady = true;
       },
       'expired-callback': function () {
+        console.log('[lws] Turnstile token expired, resetting...');
         _turnstileToken = '';
         _turnstileReady = false;
-        // Re-render to get a fresh token
         try { turnstile.reset(el); } catch (e) {}
       },
-      'error-callback': function () {
-        // Allow requests without token if Turnstile fails to load
-        console.warn('[lws] Turnstile error — requests will proceed without token');
+      'error-callback': function (errorCode) {
+        console.error('[lws] Turnstile error:', errorCode);
       },
-      execution: 'render',
     });
   }
 
