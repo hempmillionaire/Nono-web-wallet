@@ -78,6 +78,7 @@ const LwsClient = (function () {
   // re-render the widget to get a fresh one periodically.
   var _turnstileToken = '';
   var _turnstileReady = false;
+  var _sessionToken = '';
   var TURNSTILE_SITE_KEY = '0x4AAAAAADD59EiKpnk-yv1E';
 
   function initTurnstile () {
@@ -145,7 +146,9 @@ const LwsClient = (function () {
     await waitForTurnstile();
     const url = BASE_URL + path;
     var headers = { 'Content-Type': 'application/json' };
-    if (_turnstileToken) {
+    if (_sessionToken) {
+      headers['X-Session-Token'] = _sessionToken;
+    } else if (_turnstileToken) {
       headers['X-Turnstile-Token'] = _turnstileToken;
     }
     let response;
@@ -158,6 +161,9 @@ const LwsClient = (function () {
     } catch (e) {
       throw new LwsError('network', 'Could not reach light-wallet server: ' + e.message, e);
     }
+    // Capture session token from Worker for subsequent requests
+    var st = response.headers.get('X-Session-Token');
+    if (st) _sessionToken = st;
     let data;
     try { data = await response.json(); }
     catch (e) {
@@ -269,16 +275,24 @@ const LwsClient = (function () {
   async function reactivateAccount (address) {
     console.log('[lws] reactivating hidden account via admin API');
     var url = BASE_URL + '/admin/reactivate';
+    var headers = { 'Content-Type': 'application/json' };
+    if (_sessionToken) {
+      headers['X-Session-Token'] = _sessionToken;
+    } else if (_turnstileToken) {
+      headers['X-Turnstile-Token'] = _turnstileToken;
+    }
     var response;
     try {
       response = await fetch(url, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: headers,
         body: JSON.stringify({ address: address }),
       });
     } catch (e) {
       throw new LwsError('network', 'Could not reach reactivation endpoint: ' + e.message, e);
     }
+    var st = response.headers.get('X-Session-Token');
+    if (st) _sessionToken = st;
     if (!response.ok) {
       throw new LwsError('server', 'Reactivation failed (HTTP ' + response.status + ')', null, response.status);
     }
@@ -525,12 +539,18 @@ const LwsClient = (function () {
     try {
       await waitForTurnstile();
       var headers = { 'Content-Type': 'application/json' };
-      if (_turnstileToken) headers['X-Turnstile-Token'] = _turnstileToken;
-      await fetch(BASE_URL + '/admin/ping', {
+      if (_sessionToken) {
+        headers['X-Session-Token'] = _sessionToken;
+      } else if (_turnstileToken) {
+        headers['X-Turnstile-Token'] = _turnstileToken;
+      }
+      var resp = await fetch(BASE_URL + '/admin/ping', {
         method: 'POST',
         headers: headers,
         body: JSON.stringify({ address: address }),
       });
+      var st = resp.headers.get('X-Session-Token');
+      if (st) _sessionToken = st;
     } catch (e) {
       // Non-critical — don't break the login flow
       console.warn('[lws] login ping failed (non-fatal):', e.message);
