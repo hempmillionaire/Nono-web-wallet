@@ -21,7 +21,6 @@ export default {
           'Access-Control-Allow-Origin': 'https://monero-web.com',
           'Access-Control-Allow-Methods': 'POST, OPTIONS',
           'Access-Control-Allow-Headers': 'Content-Type, X-Turnstile-Token, X-Session-Token',
-          'Access-Control-Allow-Headers': 'Content-Type, X-Turnstile-Token, X-Session-Token',
           'Access-Control-Expose-Headers': 'X-Session-Token',
           'Access-Control-Max-Age': '86400',
         },
@@ -50,6 +49,21 @@ export default {
           codes: turnstileResult['error-codes'] || [],
         });
       }
+    }
+
+    // Session-only endpoint: exchange Turnstile token for session token
+    const pathname = new URL(request.url).pathname;
+    if (pathname === '/session') {
+      const newSessionToken = await createSession(secret);
+      return new Response(JSON.stringify({ ok: true }), {
+        status: 200,
+        headers: {
+          'Content-Type': 'application/json',
+          'Access-Control-Allow-Origin': 'https://monero-web.com',
+          'Access-Control-Expose-Headers': 'X-Session-Token',
+          'X-Session-Token': newSessionToken,
+        },
+      });
     }
 
     // Forward to VPS

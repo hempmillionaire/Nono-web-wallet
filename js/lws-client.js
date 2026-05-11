@@ -123,9 +123,6 @@ const LwsClient = (function () {
   }
 
   // ── Wait for Turnstile token ───────────────────────────────────────
-  // Returns immediately if token is ready, otherwise polls every 200ms
-  // for up to 10 seconds. If Turnstile never loads, proceeds without
-  // a token (the Worker will reject, but we don't block forever).
   function waitForTurnstile () {
     if (MOCK || _turnstileToken) return Promise.resolve();
     return new Promise(function (resolve) {
@@ -140,16 +137,51 @@ const LwsClient = (function () {
     });
   }
 
+  // ── Session initialisation ───────────────────────────────────────
+  // Turnstile tokens are single-use. We exchange the token for an
+  // HMAC session token once, then reuse the session for all requests.
+  // _sessionPromise ensures only one exchange happens even if multiple
+  // requests fire at the same time.
+  var _sessionPromise = null;
+
+  function ensureSession () {
+    if (MOCK) return Promise.resolve();
+    if (_sessionToken) return Promise.resolve();
+    if (_sessionPromise) return _sessionPromise;
+    _sessionPromise = _initSession();
+    return _sessionPromise;
+  }
+
+  async function _initSession () {
+    await waitForTurnstile();
+    if (!_turnstileToken) return; // Turnstile never loaded
+    try {
+      var resp = await fetch(BASE_URL + '/session', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Turnstile-Token': _turnstileToken,
+        },
+        body: '{}',
+      });
+      var st = resp.headers.get('X-Session-Token');
+      if (st) {
+        _sessionToken = st;
+        console.log('[lws] Session established');
+      }
+    } catch (e) {
+      console.warn('[lws] Session init failed:', e.message);
+    }
+  }
+
   // ── Internal POST helper ──────────────────────────────────────────
   async function post (path, body) {
     if (MOCK) return mockResponse(path, body);
-    await waitForTurnstile();
+    await ensureSession();
     const url = BASE_URL + path;
     var headers = { 'Content-Type': 'application/json' };
     if (_sessionToken) {
       headers['X-Session-Token'] = _sessionToken;
-    } else if (_turnstileToken) {
-      headers['X-Turnstile-Token'] = _turnstileToken;
     }
     let response;
     try {
@@ -161,7 +193,7 @@ const LwsClient = (function () {
     } catch (e) {
       throw new LwsError('network', 'Could not reach light-wallet server: ' + e.message, e);
     }
-    // Capture session token from Worker for subsequent requests
+    // Refresh session token if Worker sends a new one
     var st = response.headers.get('X-Session-Token');
     if (st) _sessionToken = st;
     let data;
@@ -274,13 +306,10 @@ const LwsClient = (function () {
    */
   async function reactivateAccount (address) {
     console.log('[lws] reactivating hidden account via admin API');
+    await ensureSession();
     var url = BASE_URL + '/admin/reactivate';
     var headers = { 'Content-Type': 'application/json' };
-    if (_sessionToken) {
-      headers['X-Session-Token'] = _sessionToken;
-    } else if (_turnstileToken) {
-      headers['X-Turnstile-Token'] = _turnstileToken;
-    }
+    if (_sessionToken) headers['X-Session-Token'] = _sessionToken;
     var response;
     try {
       response = await fetch(url, {
@@ -537,13 +566,9 @@ const LwsClient = (function () {
   async function pingLogin (address) {
     if (MOCK) return;
     try {
-      await waitForTurnstile();
+      await ensureSession();
       var headers = { 'Content-Type': 'application/json' };
-      if (_sessionToken) {
-        headers['X-Session-Token'] = _sessionToken;
-      } else if (_turnstileToken) {
-        headers['X-Turnstile-Token'] = _turnstileToken;
-      }
+      if (_sessionToken) headers['X-Session-Token'] = _sessionToken;
       var resp = await fetch(BASE_URL + '/admin/ping', {
         method: 'POST',
         headers: headers,
