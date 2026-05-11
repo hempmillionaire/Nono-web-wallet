@@ -100,7 +100,8 @@ const LwsClient = (function () {
         // Allow requests without token if Turnstile fails to load
         console.warn('[lws] Turnstile error — requests will proceed without token');
       },
-      size: 'invisible',
+      size: 'compact',
+      appearance: 'interaction-only',
     });
   }
 
