@@ -71,15 +71,69 @@ const LwsClient = (function () {
   function setMockMode (on) { MOCK = !!on; }
   function isMock () { return MOCK; }
 
+  // ── Turnstile token management ────────────────────────────────────
+  // Cloudflare Turnstile verifies the user is human. The token is
+  // attached to every LWS request so the Worker proxy can validate it
+  // before forwarding to the VPS. Tokens expire after ~300s so we
+  // re-render the widget to get a fresh one periodically.
+  var _turnstileToken = '';
+  var _turnstileReady = false;
+  var TURNSTILE_SITE_KEY = '0x4AAAAAADD59EiKpnk-yv1E';
+
+  function initTurnstile () {
+    if (MOCK || typeof turnstile === 'undefined') return;
+    var el = document.getElementById('turnstile-box');
+    if (!el) return;
+    turnstile.render(el, {
+      sitekey: TURNSTILE_SITE_KEY,
+      callback: function (token) {
+        _turnstileToken = token;
+        _turnstileReady = true;
+      },
+      'expired-callback': function () {
+        _turnstileToken = '';
+        _turnstileReady = false;
+        // Re-render to get a fresh token
+        try { turnstile.reset(el); } catch (e) {}
+      },
+      'error-callback': function () {
+        // Allow requests without token if Turnstile fails to load
+        console.warn('[lws] Turnstile error — requests will proceed without token');
+      },
+      size: 'invisible',
+    });
+  }
+
+  // Initialize Turnstile when the script loads
+  if (typeof document !== 'undefined') {
+    if (typeof turnstile !== 'undefined') {
+      initTurnstile();
+    } else {
+      // Turnstile script loads async — wait for it
+      var _tsCheck = setInterval(function () {
+        if (typeof turnstile !== 'undefined') {
+          clearInterval(_tsCheck);
+          initTurnstile();
+        }
+      }, 200);
+      // Stop checking after 10s
+      setTimeout(function () { clearInterval(_tsCheck); }, 10000);
+    }
+  }
+
   // ── Internal POST helper ──────────────────────────────────────────
   async function post (path, body) {
     if (MOCK) return mockResponse(path, body);
     const url = BASE_URL + path;
+    var headers = { 'Content-Type': 'application/json' };
+    if (_turnstileToken) {
+      headers['X-Turnstile-Token'] = _turnstileToken;
+    }
     let response;
     try {
       response = await fetch(url, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: headers,
         body: JSON.stringify(body),
       });
     } catch (e) {
