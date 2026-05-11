@@ -523,9 +523,12 @@ const LwsClient = (function () {
   async function pingLogin (address) {
     if (MOCK) return;
     try {
+      await waitForTurnstile();
+      var headers = { 'Content-Type': 'application/json' };
+      if (_turnstileToken) headers['X-Turnstile-Token'] = _turnstileToken;
       await fetch(BASE_URL + '/admin/ping', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: headers,
         body: JSON.stringify({ address: address }),
       });
     } catch (e) {
