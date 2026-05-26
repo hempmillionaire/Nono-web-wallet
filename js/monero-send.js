@@ -68,10 +68,13 @@ const MoneroSend = (function () {
   var TYPICAL_TX_BYTES = 2000;
 
   async function estimateFee (walletKeys, toAddress, xmrAmount, priority) {
+    // mixin=0: fetch ALL outputs regardless of their historical ring size.
+    // Old RingCT outputs received in low-mixin txs (2019-2021 era) are perfectly
+    // spendable in modern transactions — LWS's mixin filter incorrectly hides them.
     var outs = await LwsClient.getUnspentOuts(
       walletKeys.address,
       walletKeys.privateViewKeyHex,
-      '0', 16, false
+      '0', 0, true
     );
 
     var perKbFee = BigInt(outs.per_kb_fee || outs.per_byte_fee * 1024 || '24658');
@@ -103,10 +106,17 @@ const MoneroSend = (function () {
     var amountAtomic = BigInt(xmrToAtomic(xmrAmount));
 
     // 1. Always fetch fresh unspent outputs (never use cached preview —
-    // the LWS state can change between Review and Confirm steps)
+    // the LWS state can change between Review and Confirm steps).
+    //
+    // mixin=0: fetch ALL outputs regardless of their historical ring size.
+    // LWS filters outputs by the mixin count of the RECEIVING transaction, not
+    // the spending transaction. Old RingCT outputs received in low-mixin txs
+    // (typically 2–10 ring members, 2017–2021 era) are perfectly spendable in
+    // modern transactions — they just look "underspendable" to LWS's filter.
+    // Passing mixin=0 bypasses that filter so we see every output.
     var unspentResp = await LwsClient.getUnspentOuts(
       walletKeys.address, walletKeys.privateViewKeyHex,
-      '0', DEFAULT_MIXIN, true
+      '0', 0, true
     );
 
     if (!unspentResp || !Array.isArray(unspentResp.outputs) || unspentResp.outputs.length === 0) {
@@ -116,10 +126,20 @@ const MoneroSend = (function () {
 
     // Verify which outputs are actually spendable using key_image
     // verification. Outputs with spend_key_images may be falsely flagged
-    // (ring decoy appearances). Compute the real key_image and check.
+    // (ring decoy appearances from other wallets' transactions). Compute
+    // the real key_image and check if it truly appears in the spend list.
+    //
+    // Also skip pre-RingCT outputs (empty rct field): those were created
+    // before Monero's v9 hard fork (Oct 2018) and cannot be included in
+    // modern RingCT transactions regardless of their unspent status.
     var spendableOuts = [];
     for (var oi = 0; oi < unspentResp.outputs.length; oi++) {
       var o = unspentResp.outputs[oi];
+
+      // Skip pre-RingCT outputs — they can't be spent in modern transactions.
+      // These have an empty or missing rct field and were received before v9.
+      if (!o.rct || o.rct === '') continue;
+
       if (!o.spend_key_images || o.spend_key_images.length === 0) {
         // No spend reports — definitely unspent
         spendableOuts.push(o);

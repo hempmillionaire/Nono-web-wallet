@@ -368,7 +368,7 @@ const LwsClient = (function () {
       address,
       view_key: viewKey,
       amount: String(amount || '0'),
-      mixin: mixin || 15,
+      mixin: (typeof mixin === 'number') ? mixin : 15,
       use_dust: !!useDust,
       dust_threshold: '2000000000',
     });
