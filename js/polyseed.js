@@ -44,6 +44,9 @@ const Polyseed = (function () {
   const POLY_NUM_CHECK_DIGITS = 1;
   const DATA_WORDS = NUM_WORDS - POLY_NUM_CHECK_DIGITS;
   const COIN_MONERO = 0;
+  // Polyseed feature bit 4 (value 16) marks a passphrase-encrypted seed.
+  // Mirrors ENCRYPTED_MASK / is_encrypted() from polyseed's src/features.h.
+  const ENCRYPTED_MASK = 16;
 
   // Mirrors polyseed_mul2_table from src/gf.c
   const MUL2_TABLE = [5, 7, 1, 3, 13, 15, 9, 11];
@@ -163,7 +166,21 @@ const Polyseed = (function () {
       throw new Error('polyseed: invalid checksum');
     }
 
-    return polyToData(coeff);
+    const data = polyToData(coeff);
+
+    // Reject passphrase-encrypted Polyseeds (e.g. those Cake Wallet creates
+    // with a passphrase). We don't support Polyseed passphrases, and the
+    // stored secret is still encrypted — deriving keys from it would silently
+    // produce a completely wrong wallet. Surface a clear error instead.
+    if (data.features & ENCRYPTED_MASK) {
+      throw new Error(
+        'This Polyseed is passphrase-encrypted (the "encrypted" feature bit ' +
+        'is set). Passphrase-protected Polyseeds are not supported here — ' +
+        'restore it in a wallet that supports the Polyseed passphrase.'
+      );
+    }
+
+    return data;
   }
 
   function u32le(n) {

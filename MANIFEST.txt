@@ -1,5 +1,5 @@
 # monero-web build manifest
-# Generated 2026-05-26T20:48:15Z from commit 765e2c0
+# Generated 2026-06-06T02:16:31Z from commit f9bbbab
 #
 # Verify the live deployment matches a specific git tag with:
 #   git checkout v0.1.0
@@ -27,7 +27,7 @@ db5ff4db83e580426280e9337a58dc57d3a83784a1b03ad80914651594441d52  fonts/c8b23d7b
 e69e68e71f568e236f199826c266a832f69b5a1a28f58f36d2f38c7d3117ed02  index.html
 f5d61babe30ae09ed28b1b5183e45fbf17941fcbb208bd4c47e1abfed4494a3e  js/bip39.js
 a0bf069d19922a0df40c278c40bc82a8edc55658b587d1bb5a09b5a06ec98244  js/bip39-wordlist.js
-9a7d77080cde2a4fdd17cfafdf96deb25b1a9ed61d18224d12471fb9d8a955f5  js/dashboard-page.js
+dd94ac76e20379e8a4e76155255b9cb2803e1bf37efa7fcb047a111dce19e95a  js/dashboard-page.js
 5fd70306222d65cfa060fed66c9c1d2b77c1626320255554187d19b5f81c6d0b  js/index-page.js
 ca17e7555699565d53195a7404306ac7b9399704d80fa379b61355e5f9b19b20  js/jsqr.js
 b780f029e218e4b7c7142cfdb2161f8fb30248da8f9c022619812bc9180e7d69  js/keccak256.js
@@ -48,7 +48,7 @@ cee586c946cb838f590db096c8f3d89e58a9c0ec81393f421cfed0fadf3a6c06  js/mymonero-co
 bf22b13d1187c01fe962b65098e47c9fbd29555eef224e91adeaf30c3d4fc155  js/mymonero-core/MyMoneroCoreCpp_WASM.wasm
 3e30e3f371cf1669f8c114ba0b9440657ed6486b7d47bfefb9d5d05fa28842b2  js/mymonero-core/README.md
 ecbb9fca8238f7c0fe3edf2d7901fe4e2501e96512c68901225cc8180119eccd  js/mymonero-loader.js
-1fea789d0d94133b6e12ef50408a13bf66d1d4298eb0ab2411d79400b5a3999e  js/polyseed.js
+a89e09d29278744721e647b205a9a85f6dd3622a1f0d2d4c3804333cf28e5061  js/polyseed.js
 5f5e2c80f5ba8b2b68d771fc44da7b5fd4a3e256526f78f985644f99e0df84c4  js/qrcodegen.js
 4695ae6ccba75eb2775e6eadab605cad283256ba1866fe78f458baf65b5a5f85  js/qr-scanner.js
 d1f721f6bcf4d59577cdec34aef9db81b98d5f41d7f5310a8b01c6c81cb96991  js/swap-popup.js
