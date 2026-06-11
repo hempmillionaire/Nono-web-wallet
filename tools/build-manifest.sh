@@ -34,6 +34,7 @@ INCLUDED_PATTERNS=(
   "assets/*.png"
   "donation-qr.svg"
   "favicon.svg"
+  "favicon.ico"
   "_redirects"
 )
 
