@@ -149,6 +149,14 @@ const LwsClient = (function () {
     return _sessionPromise;
   }
 
+  // Eagerly start the Turnstile→session handshake so it overlaps page
+  // load instead of blocking the first wallet request. Idempotent (guarded
+  // by _sessionToken/_sessionPromise) and non-fatal — on any failure the
+  // lazy path in post() runs exactly as before.
+  function prewarm () {
+    try { ensureSession(); } catch (e) {}
+  }
+
   async function _initSession () {
     await waitForTurnstile();
     if (!_turnstileToken) return; // Turnstile never loaded
@@ -591,6 +599,7 @@ const LwsClient = (function () {
     scanProgress,
     formatXmr,
     pingLogin,
+    prewarm,
     setBaseUrl,
     setMockMode,
     isMock,

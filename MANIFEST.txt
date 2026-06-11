@@ -1,5 +1,5 @@
 # monero-web build manifest
-# Generated 2026-06-11T09:30:59Z from commit a3da3a3
+# Generated 2026-06-11T13:45:17Z from commit 1813f4f
 #
 # Verify the live deployment matches a specific git tag with:
 #   git checkout v0.1.0
@@ -28,11 +28,11 @@ db5ff4db83e580426280e9337a58dc57d3a83784a1b03ad80914651594441d52  fonts/c8b23d7b
 c1a036c88be27603e8fc24364bcf983077265d8e6caf854dd68d7c993663c8fb  index.html
 f5d61babe30ae09ed28b1b5183e45fbf17941fcbb208bd4c47e1abfed4494a3e  js/bip39.js
 a0bf069d19922a0df40c278c40bc82a8edc55658b587d1bb5a09b5a06ec98244  js/bip39-wordlist.js
-dd94ac76e20379e8a4e76155255b9cb2803e1bf37efa7fcb047a111dce19e95a  js/dashboard-page.js
+b6efa873f737cd361601bb22f9387e6cb1628d6fa4c99a050e480c9fdaccc164  js/dashboard-page.js
 5fd70306222d65cfa060fed66c9c1d2b77c1626320255554187d19b5f81c6d0b  js/index-page.js
 ca17e7555699565d53195a7404306ac7b9399704d80fa379b61355e5f9b19b20  js/jsqr.js
 b780f029e218e4b7c7142cfdb2161f8fb30248da8f9c022619812bc9180e7d69  js/keccak256.js
-f6dd334cd667af6b8ab2fd87977c74b6bfc7b98f9f274b4c6128c551c22cf937  js/lws-client.js
+bd58e3375c547007a2c5b267609e3f629890c454bb48f03e8dd02464007a743c  js/lws-client.js
 9eee6ea1db393dfbd12bb06e4116d5c61f3c03aa75b4be3403d362857cde821a  js/monero-ed25519.js
 d5809ca4685de99f36ca8f14650ce73b1ed5abfa196a75a1d225a0e82ceb006d  js/monero-english-wordlist.js
 ca882fb56e7fec6c80bb6ea611a8922bdf6730a5c17bd97bb22216245a0ed0ef  js/monero-keys.js

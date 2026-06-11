@@ -117,6 +117,12 @@ document.addEventListener('DOMContentLoaded', async () => {
   function initDashboard() {
     document.getElementById('loading-state').style.display = 'none';
     document.getElementById('dashboard').style.display = 'block';
+    // Kick off the Turnstile→session handshake immediately so it runs in
+    // parallel with WASM/asset load instead of blocking the first balance
+    // request. Fire-and-forget; the lazy path still covers any failure.
+    if (typeof LwsClient !== 'undefined' && LwsClient.prewarm) {
+      LwsClient.prewarm();
+    }
     // Preload WASM in background so it's ready for key_image verification
     // and send. Don't await — let it load while the dashboard connects.
     if (typeof MoneroCore !== 'undefined') {
