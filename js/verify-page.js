@@ -246,7 +246,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const pubView   = MoneroEd25519.scalarmultBase(reduced);
         const keys = {
           address:            addr,
-          network:            $val('network-select') || 'mainnet',
+          network:            'mainnet',
           privateSpendKeyHex: '',
           privateViewKeyHex:  MoneroKeys.bytesToHex(reduced),
           publicSpendKeyHex:  '',
@@ -278,7 +278,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const mnemonic = (seedInput && seedInput.value || '').trim();
         // Language is auto-detected by MoneroKeys.detectLanguage(); we pass
         // null so the engine picks whichever wordlist actually matches.
-        const network    = $val('network-select') || 'mainnet';
+        const network    = 'mainnet';
         const passphrase = $val('bip39-pass');
         const keys = await MoneroKeys.deriveFromAnyMnemonic(mnemonic, null, network, passphrase);
         // Attach the user-supplied restore height (if any) so the dashboard
@@ -309,7 +309,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     setTimeout(() => {
       try {
-        const network = $val('network-select') || 'mainnet';
+        const network = 'mainnet';
         const spendHex = (spendKeyInput && spendKeyInput.value || '').trim().toLowerCase();
         const keys = MoneroKeys.deriveFromSpendKey(spendHex, network);
         showResults(keys);
@@ -418,7 +418,7 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
           const wallet = MoneroKeys.generateWallet(
             $val('create-lang') || 'english',
-            $val('network-select') || 'mainnet'
+            'mainnet'
           );
 
           document.getElementById('create-mnemonic').textContent = wallet.mnemonic;
