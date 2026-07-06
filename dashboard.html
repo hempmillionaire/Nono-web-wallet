@@ -203,6 +203,14 @@ footer p{font-size:.65rem;color:var(--text-dim)}
 
       <!-- Address -->
       <div class="wallet-header fade-in">
+        <div style="display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:10px;margin-bottom:10px">
+          <span id="network-badge" style="font-size:.7rem;font-weight:600;letter-spacing:.04em;text-transform:uppercase;padding:5px 10px;border-radius:100px;background:var(--surface-2);border:1px solid var(--border);color:var(--xmr)">Monero · XMR</span>
+          <select id="dashboard-network-select" title="Switch network (re-derives address from same seed)" style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-sm);padding:6px 10px;font-family:'Outfit',sans-serif;font-size:.72rem;color:var(--text);cursor:pointer">
+            <option value="monero-mainnet">Monero Mainnet</option>
+            <option value="nono-mainnet">NONO Mainnet</option>
+          </select>
+        </div>
+        <div id="lws-unavailable-banner" style="display:none;max-width:520px;margin:0 auto 12px;padding:10px 14px;font-size:.72rem;line-height:1.45;color:var(--text-dim);background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius-sm)"></div>
         <div class="wallet-address" id="wallet-address" title="Click to copy">
           <span class="copy-toast" id="addr-toast">Copied!</span>
         </div>
@@ -213,7 +221,7 @@ footer p{font-size:.65rem;color:var(--text-dim)}
         <div class="balance-label">Balance</div>
         <div class="balance-value">
           <span id="balance-xmr">—</span>
-          <span class="xmr-symbol">XMR</span>
+          <span class="xmr-symbol" id="balance-ticker">XMR</span>
         </div>
         <div id="balance-fiat" style="font-size:.85rem;color:var(--text-dim);margin-top:2px;font-family:'JetBrains Mono',monospace"></div>
         <div class="balance-note" id="balance-note">Scanning blockchain...</div>
@@ -514,6 +522,7 @@ footer p{font-size:.65rem;color:var(--text-dim)}
 <script src="js/keccak256.js"></script>
 <script src="js/monero-ed25519.js"></script>
 <script src="js/monero-wordlist.js"></script>
+<script src="js/networks.js"></script>
 <script src="js/monero-keys.js"></script>
 <script src="js/monero-subaddress.js"></script>
 <script src="js/qrcodegen.js"></script>

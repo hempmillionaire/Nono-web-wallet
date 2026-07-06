@@ -20,7 +20,12 @@
 const MoneroSubaddress = (function () {
   'use strict';
 
-  const SUBADDRESS_NETBYTE = 0x2A; // mainnet subaddress prefix → "8..."
+  function subaddressNetByte(networkIdOrLegacy) {
+    if (typeof Networks === 'undefined') {
+      throw new Error('Networks module not loaded — include js/networks.js before monero-subaddress.js');
+    }
+    return Networks.getSubaddressPrefix(networkIdOrLegacy);
+  }
 
   function u32le(n) {
     return new Uint8Array([
@@ -59,9 +64,9 @@ const MoneroSubaddress = (function () {
    * Encode a Monero subaddress from its public spend & view points.
    * Mirrors MoneroKeys.encodeAddress() but with the subaddress netbyte.
    */
-  function encodeSubaddress(pubSpend, pubView) {
+  function encodeSubaddress(pubSpend, pubView, networkIdOrLegacy) {
     const raw = new Uint8Array(69);
-    raw[0] = SUBADDRESS_NETBYTE;
+    raw[0] = subaddressNetByte(networkIdOrLegacy || 'monero-mainnet');
     raw.set(pubSpend, 1);
     raw.set(pubView, 33);
     const hash = Keccak256.hash(raw.slice(0, 65));
@@ -80,7 +85,7 @@ const MoneroSubaddress = (function () {
    * @param {number}     minor     - Subaddress index within the account
    * @returns {Object}   { major, minor, address, publicSpendKeyHex, publicViewKeyHex }
    */
-  function generate(keys, major, minor) {
+  function generate(keys, major, minor, networkIdOrLegacy) {
     if (major === 0 && minor === 0) {
       throw new Error('Index (0,0) is the primary address, not a subaddress');
     }
@@ -88,7 +93,7 @@ const MoneroSubaddress = (function () {
     const mG = MoneroEd25519.scalarmultBase(m);
     const subSpend = MoneroEd25519.pointAdd(keys.publicSpendKey, mG);
     const subView  = MoneroEd25519.scalarmult(keys.privateViewKey, subSpend);
-    const address  = encodeSubaddress(subSpend, subView);
+    const address  = encodeSubaddress(subSpend, subView, networkIdOrLegacy);
     return {
       major,
       minor,

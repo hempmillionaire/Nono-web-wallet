@@ -41,13 +41,39 @@ document.addEventListener('DOMContentLoaded', () => {
   // picked up by the dashboard's MoneroRPC calls. Letting users configure
   // this BEFORE deriving keys means the view key can go straight to their
   // own node on the first LWS /login call — it never touches our default.
-  const NODE_KEY = 'monero-web-node-url';
+  const NODE_KEY = 'monero-web-node-url'; // legacy; per-network keys live in Networks registry
+
+  const networkSelect = document.getElementById('network-select');
+
+  function getSelectedNetworkId () {
+    if (networkSelect && networkSelect.value) return networkSelect.value;
+    return Networks.getActiveId();
+  }
+
+  function getNodeStorageKey () {
+    return Networks.get(getSelectedNetworkId()).customNodeStorageKey;
+  }
+
+  function applySelectedNetwork () {
+    Networks.setActiveId(getSelectedNetworkId());
+  }
+
+  if (networkSelect) {
+    networkSelect.value = Networks.getActiveId();
+    networkSelect.addEventListener('change', () => {
+      applySelectedNetwork();
+      try {
+        advInput.value = localStorage.getItem(getNodeStorageKey()) || '';
+      } catch (e) {}
+    });
+  }
+  applySelectedNetwork();
   const advInput = $el('adv-node-url');
   const advMsg   = $el('adv-node-msg');
   const advSave  = $el('adv-node-save');
   const advReset = $el('adv-node-reset');
   if (advInput) {
-    try { advInput.value = localStorage.getItem(NODE_KEY) || ''; } catch (e) {}
+    try { advInput.value = localStorage.getItem(getNodeStorageKey()) || ''; } catch (e) {}
     if (advMsg && advInput.value) {
       advMsg.textContent = 'Using your custom node.';
       advMsg.style.color = 'var(--success)';
@@ -60,8 +86,8 @@ document.addEventListener('DOMContentLoaded', () => {
         return;
       }
       try {
-        if (v) localStorage.setItem(NODE_KEY, v.replace(/\/$/, ''));
-        else   localStorage.removeItem(NODE_KEY);
+        if (v) localStorage.setItem(getNodeStorageKey(), v.replace(/\/$/, ''));
+        else   localStorage.removeItem(getNodeStorageKey());
         advMsg.textContent = v ? 'Saved. Your wallet will use this node.' : 'Cleared. Using monero-web proxy.';
         advMsg.style.color = v ? 'var(--success)' : 'var(--text-dim)';
       } catch (e) {
@@ -70,7 +96,7 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     });
     if (advReset) advReset.addEventListener('click', () => {
-      try { localStorage.removeItem(NODE_KEY); } catch (e) {}
+      try { localStorage.removeItem(getNodeStorageKey()); } catch (e) {}
       advInput.value = '';
       advMsg.textContent = 'Reverted to monero-web proxy (default).';
       advMsg.style.color = 'var(--text-dim)';
@@ -142,6 +168,10 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function ageToHeight(age) {
+    // Monero checkpoint estimator — not valid for NONO; use manual restore height there.
+    if (getSelectedNetworkId() === 'nono-mainnet') {
+      return age === 'unknown' ? 0 : 0;
+    }
     var tip = estimatedCurrentHeight();
     switch (age) {
       case 'week':    return Math.max(0, tip - 7 * BLOCKS_PER_DAY);
@@ -246,7 +276,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const pubView   = MoneroEd25519.scalarmultBase(reduced);
         const keys = {
           address:            addr,
-          network:            'mainnet',
+          network:            getSelectedNetworkId(),
           privateSpendKeyHex: '',
           privateViewKeyHex:  MoneroKeys.bytesToHex(reduced),
           publicSpendKeyHex:  '',
@@ -278,7 +308,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const mnemonic = (seedInput && seedInput.value || '').trim();
         // Language is auto-detected by MoneroKeys.detectLanguage(); we pass
         // null so the engine picks whichever wordlist actually matches.
-        const network    = 'mainnet';
+        const network    = getSelectedNetworkId();
         const passphrase = $val('bip39-pass');
         const keys = await MoneroKeys.deriveFromAnyMnemonic(mnemonic, null, network, passphrase);
         // Attach the user-supplied restore height (if any) so the dashboard
@@ -309,9 +339,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
     setTimeout(() => {
       try {
-        const network = 'mainnet';
+        const network = getSelectedNetworkId();
         const spendHex = (spendKeyInput && spendKeyInput.value || '').trim().toLowerCase();
-        const keys = MoneroKeys.deriveFromSpendKey(spendHex, network);
+        const keys = MoneroKeys.deriveFromSpendKey(spendHex, getSelectedNetworkId());
         showResults(keys);
       } catch(e) {
         errorEl.textContent = 'Error: ' + e.message;
@@ -341,6 +371,18 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('res-pub-view').textContent = keys.publicViewKeyHex;
 
     const formatEl = document.getElementById('result-format');
+    let netEl = document.getElementById('result-network');
+    if (!netEl && formatEl) {
+      netEl = document.createElement('div');
+      netEl.id = 'result-network';
+      netEl.style.cssText = 'font-size:.72rem;color:var(--text-dim);margin:6px 0 10px';
+      formatEl.insertAdjacentElement('afterend', netEl);
+    }
+    if (netEl && typeof Networks !== 'undefined') {
+      const cfg = Networks.get(keys.network || getSelectedNetworkId());
+      netEl.textContent = 'Network: ' + cfg.displayName + ' · ' + cfg.ticker + ' (' + cfg.expectedAddressHint + ')';
+    }
+
     if (keys.wordCount) {
       const fmt = formats[keys.wordCount];
       formatEl.textContent = (fmt ? fmt.icon + ' ' : '') + 'Derived via ' + (fmt ? fmt.name : keys.wordCount + '-word seed');
@@ -418,7 +460,7 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
           const wallet = MoneroKeys.generateWallet(
             $val('create-lang') || 'english',
-            'mainnet'
+            getSelectedNetworkId()
           );
 
           document.getElementById('create-mnemonic').textContent = wallet.mnemonic;

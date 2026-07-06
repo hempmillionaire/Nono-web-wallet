@@ -120,7 +120,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Kick off the Turnstile→session handshake immediately so it runs in
     // parallel with WASM/asset load instead of blocking the first balance
     // request. Fire-and-forget; the lazy path still covers any failure.
-    if (typeof LwsClient !== 'undefined' && LwsClient.prewarm) {
+    if (typeof LwsClient !== 'undefined' && LwsClient.prewarm && LwsClient.isAvailable()) {
       LwsClient.prewarm();
     }
     // Preload WASM in background so it's ready for key_image verification
@@ -135,6 +135,77 @@ document.addEventListener('DOMContentLoaded', async () => {
   async function populateWallet() {
 
   const isWatchOnly = !!walletKeys.watchOnly;
+
+  // ─── Active network (Monero vs NONO) ───
+  walletKeys.network = Networks.resolve(walletKeys.network || Networks.getActiveId());
+  Networks.setActiveId(walletKeys.network);
+  let netCfg = Networks.get(walletKeys.network);
+  const networkBadge = document.getElementById('network-badge');
+  const balanceTicker = document.getElementById('balance-ticker');
+  const dashNetSelect = document.getElementById('dashboard-network-select');
+  if (networkBadge) networkBadge.textContent = netCfg.displayName + ' · ' + netCfg.ticker;
+  if (balanceTicker) balanceTicker.textContent = netCfg.ticker;
+  if (dashNetSelect) dashNetSelect.value = netCfg.id;
+
+  function updateLwsUnavailableBanner () {
+    const banner = document.getElementById('lws-unavailable-banner');
+    if (!banner) return;
+    if (typeof LwsClient !== 'undefined' && !LwsClient.isAvailable()) {
+      banner.style.display = 'block';
+      banner.textContent =
+        'Balance and transaction history require a light-wallet server for ' + netCfg.displayName +
+        '. LWS is not configured for this network yet (NONO is Phase 2). Address, receive, and keys still work.';
+    } else {
+      banner.style.display = 'none';
+      banner.textContent = '';
+    }
+  }
+  updateLwsUnavailableBanner();
+
+  function refreshPrimaryAddressDisplay () {
+    const addrEl = document.getElementById('wallet-address');
+    Array.from(addrEl.childNodes).forEach(function (n) {
+      if (n.nodeType === Node.TEXT_NODE) addrEl.removeChild(n);
+    });
+    addrEl.insertAdjacentText('afterbegin', walletKeys.address);
+    document.getElementById('receive-addr').textContent = walletKeys.address;
+  }
+
+  if (dashNetSelect && !dashNetSelect.dataset.bound) {
+    dashNetSelect.dataset.bound = '1';
+    dashNetSelect.addEventListener('change', async function () {
+      const newId = Networks.resolve(dashNetSelect.value);
+      if (newId === Networks.resolve(walletKeys.network)) return;
+      if (isWatchOnly) {
+        alert('Watch-only: import each chain\'s address on Verify — cannot re-derive from spend key.');
+        dashNetSelect.value = Networks.resolve(walletKeys.network);
+        return;
+      }
+      if (!walletKeys.privateSpendKeyHex) {
+        alert('Spend key required to switch networks.');
+        dashNetSelect.value = Networks.resolve(walletKeys.network);
+        return;
+      }
+      const updated = MoneroKeys.deriveFromSpendKey(walletKeys.privateSpendKeyHex, newId);
+      walletKeys = Object.assign({}, walletKeys, updated);
+      WalletVault.store(walletKeys);
+      Networks.setActiveId(newId);
+      netCfg = Networks.get(walletKeys.network);
+      if (networkBadge) networkBadge.textContent = netCfg.displayName + ' · ' + netCfg.ticker;
+      if (balanceTicker) balanceTicker.textContent = netCfg.ticker;
+      lwsRegistered = false;
+      if (balancePollTimer) { clearInterval(balancePollTimer); balancePollTimer = null; }
+      refreshPrimaryAddressDisplay();
+      updateLwsUnavailableBanner();
+      renderSubBook();
+      try {
+        await MoneroRPC.connect();
+        startBalancePolling();
+      } catch (e) {
+        console.warn('[network] RPC reconnect failed:', e.message);
+      }
+    });
+  }
 
   // ─── Populate wallet info ───
   document.getElementById('wallet-address').insertAdjacentText('afterbegin', walletKeys.address);
@@ -272,7 +343,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       const realIdx = list.length - 1 - displayIdx;
       let address = '— locked —';
       try {
-        if (subKeys) address = MoneroSubaddress.generate(subKeys, entry.major, entry.minor).address;
+        if (subKeys) address = MoneroSubaddress.generate(subKeys, entry.major, entry.minor, walletKeys.network).address;
       } catch (e) { address = '(error)'; }
 
       const row = document.createElement('div');
@@ -328,7 +399,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       const minor = parseInt(subMinor.value, 10) || 0;
       if (major === 0 && minor === 0) throw new Error('Index (0,0) is your primary address — cannot be a subaddress');
       // Validate by actually deriving
-      MoneroSubaddress.generate(subKeys, major, minor);
+      MoneroSubaddress.generate(subKeys, major, minor, walletKeys.network);
       const list = loadSubBook();
       // Don't allow exact duplicates of (major, minor)
       if (list.some(e => e.major === major && e.minor === minor)) {
@@ -430,6 +501,13 @@ document.addEventListener('DOMContentLoaded', async () => {
   async function startBalancePolling () {
     const balEl  = document.getElementById('balance-xmr');
     const noteEl = document.getElementById('balance-note');
+
+    updateLwsUnavailableBanner();
+    if (typeof LwsClient !== 'undefined' && !LwsClient.isAvailable()) {
+      balEl.textContent = '—';
+      noteEl.textContent = 'Light-wallet scan not available on this network.';
+      return;
+    }
 
     // Mark as scanning while we wait for the first response
     balEl.textContent = '—';

@@ -71,6 +71,41 @@ const LwsClient = (function () {
   function setMockMode (on) { MOCK = !!on; }
   function isMock () { return MOCK; }
 
+  // Active chain/network — configured via js/networks.js
+  let activeNetworkId = 'monero-mainnet';
+
+  function setActiveNetwork (networkIdOrLegacy) {
+    if (typeof Networks === 'undefined') return;
+    const cfg = Networks.get(networkIdOrLegacy);
+    activeNetworkId = cfg.id;
+    let url = '';
+    try {
+      url = localStorage.getItem(cfg.lwsUrlStorageKey) || '';
+    } catch (e) {}
+    if (!url) url = cfg.defaultLwsUrl || '';
+    if (url) {
+      setBaseUrl(url);
+    } else {
+      BASE_URL = '';
+    }
+    _sessionToken = '';
+    _sessionPromise = null;
+  }
+
+  function getActiveNetworkId () {
+    return activeNetworkId;
+  }
+
+  /** True when this network has a light-wallet backend configured (Phase 2 for NONO). */
+  function isAvailable () {
+    if (MOCK) return true;
+    if (typeof Networks !== 'undefined') {
+      const cfg = Networks.get(activeNetworkId);
+      if (!cfg.lwsAvailable) return false;
+    }
+    return !!BASE_URL;
+  }
+
   // ── Turnstile token management ────────────────────────────────────
   // Cloudflare Turnstile verifies the user is human. The token is
   // attached to every LWS request so the Worker proxy can validate it
@@ -182,6 +217,9 @@ const LwsClient = (function () {
   // ── Internal POST helper ──────────────────────────────────────────
   async function post (path, body) {
     if (MOCK) return mockResponse(path, body);
+    if (!isAvailable()) {
+      throw new LwsError('unavailable', 'Light-wallet server is not configured for this network.');
+    }
     await ensureSession();
     const url = BASE_URL + path;
     var headers = { 'Content-Type': 'application/json' };
@@ -601,6 +639,9 @@ const LwsClient = (function () {
     pingLogin,
     prewarm,
     setBaseUrl,
+    setActiveNetwork,
+    getActiveNetworkId,
+    isAvailable,
     setMockMode,
     isMock,
     LwsError,

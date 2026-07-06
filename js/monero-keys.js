@@ -16,20 +16,28 @@
 const MoneroKeys = (function () {
   'use strict';
 
-  const MAINNET  = 0x12;  // '4...'
-  const TESTNET  = 0x35;  // '9...' or 'A...'
-  const STAGENET = 0x18;  // '5...'
+  /**
+   * Address net byte from js/networks.js (supports monero-mainnet, nono-mainnet, legacy nettypes).
+   */
+  function netByteForNetwork(networkIdOrLegacy) {
+    if (typeof Networks === 'undefined') {
+      throw new Error('Networks module not loaded — include js/networks.js before monero-keys.js');
+    }
+    return Networks.getAddressPrefix(networkIdOrLegacy);
+  }
 
   /**
    * Derive all keys from a raw 32-byte seed (private spend key material)
    * This is the core derivation — independent of mnemonic format.
    *
    * @param {Uint8Array} seedBytes - 32-byte seed
-   * @param {string} network - 'mainnet'|'testnet'|'stagenet'
+   * @param {string} networkIdOrLegacy - network id or legacy 'mainnet'|'testnet'|'stagenet'
    * @returns {Object}
    */
-  function deriveFromSeed(seedBytes, network) {
-    network = network || 'mainnet';
+  function deriveFromSeed(seedBytes, networkIdOrLegacy) {
+    const networkId = (typeof Networks !== 'undefined')
+      ? Networks.resolve(networkIdOrLegacy || 'monero-mainnet')
+      : (networkIdOrLegacy || 'mainnet');
     if (seedBytes.length !== 32) {
       throw new Error(`Seed must be 32 bytes, got ${seedBytes.length}`);
     }
@@ -39,17 +47,14 @@ const MoneroKeys = (function () {
     const publicSpendKey  = MoneroEd25519.scalarmultBase(privateSpendKey);
     const publicViewKey   = MoneroEd25519.scalarmultBase(privateViewKey);
 
-    let netByte;
-    switch (network) {
-      case 'testnet':  netByte = TESTNET; break;
-      case 'stagenet': netByte = STAGENET; break;
-      default:         netByte = MAINNET;
-    }
+    const netByte = (typeof Networks !== 'undefined')
+      ? netByteForNetwork(networkId)
+      : (networkId === 'testnet' ? 0x35 : networkId === 'stagenet' ? 0x18 : 0x12);
 
     const address = encodeAddress(netByte, publicSpendKey, publicViewKey);
 
     return {
-      network,
+      network: networkId,
       privateSpendKey,
       privateViewKey,
       publicSpendKey,

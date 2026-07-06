@@ -25,15 +25,38 @@ const MoneroRPC = (function () {
   //   • Netlify:     netlify/functions/node-proxy.js → /.netlify/functions/node-proxy
   // We pick one based on the deployment host so the same JS works on either.
   // (Cloudflare is the primary; Netlify is kept as a fallback for now.)
-  const PROXY_URL = (typeof location !== 'undefined' &&
-                     /\.netlify\.(app|com)$/i.test(location.hostname))
-    ? '/.netlify/functions/node-proxy'
-    : '/api/proxy';
-  // localStorage key for an optional user-supplied direct node URL
-  // (e.g. "https://my-node.example:18089"). When set, the proxy is bypassed
-  // and requests go straight to that node — the node must serve CORS headers
-  // and use HTTPS, otherwise the browser will block the request.
-  const CUSTOM_NODE_KEY = 'monero-web-node-url';
+  // Picked per active network from js/networks.js (see setActiveNetwork).
+  let PROXY_URL = '/api/proxy';
+  // Per-network localStorage key for optional user-supplied direct node URL.
+  let CUSTOM_NODE_KEY = 'monero-web-node-url:monero-mainnet';
+  let activeNetworkId = 'monero-mainnet';
+
+  function setActiveNetwork(networkIdOrLegacy) {
+    if (typeof Networks === 'undefined') return;
+    const cfg = Networks.get(networkIdOrLegacy);
+    activeNetworkId = cfg.id;
+    if (cfg.id === 'monero-mainnet' && typeof location !== 'undefined' &&
+        /\.netlify\.(app|com)$/i.test(location.hostname)) {
+      PROXY_URL = '/.netlify/functions/node-proxy';
+    } else {
+      PROXY_URL = cfg.rpcProxyPath || '/api/proxy';
+    }
+    CUSTOM_NODE_KEY = cfg.customNodeStorageKey || 'monero-web-node-url';
+    currentNode = null;
+    // One-time migration: legacy single key → monero-mainnet key
+    if (cfg.id === 'monero-mainnet') {
+      try {
+        const legacy = localStorage.getItem('monero-web-node-url');
+        if (legacy && !localStorage.getItem(CUSTOM_NODE_KEY)) {
+          localStorage.setItem(CUSTOM_NODE_KEY, legacy);
+        }
+      } catch (e) {}
+    }
+  }
+
+  function getActiveNetworkId() {
+    return activeNetworkId;
+  }
 
   function getCustomNode() {
     try { return localStorage.getItem(CUSTOM_NODE_KEY) || ''; } catch (e) { return ''; }
@@ -185,7 +208,10 @@ const MoneroRPC = (function () {
    * Connect via proxy — tests that the proxy and backend nodes are reachable
    */
   async function connect() {
-    notifyListeners({ status: 'connecting', message: 'Connecting to Monero network...' });
+    const netLabel = (typeof Networks !== 'undefined')
+      ? Networks.get(activeNetworkId).displayName
+      : 'Monero';
+    notifyListeners({ status: 'connecting', message: 'Connecting to ' + netLabel + ' network...' });
 
     try {
       const start = Date.now();
@@ -193,7 +219,9 @@ const MoneroRPC = (function () {
       const latency = Date.now() - start;
 
       currentNode = {
-        name: 'monero-web proxy',
+        name: (typeof Networks !== 'undefined')
+          ? (Networks.get(activeNetworkId).displayName + ' RPC')
+          : 'monero-web proxy',
         url: PROXY_URL,
         ok: true,
         latency,
@@ -220,7 +248,7 @@ const MoneroRPC = (function () {
     } catch(e) {
       currentNode = null;
       notifyListeners({ status: 'disconnected', message: 'No nodes reachable: ' + e.message });
-      throw new Error('Could not connect to Monero network: ' + e.message);
+      throw new Error('Could not connect to network: ' + e.message);
     }
   }
 
@@ -332,6 +360,8 @@ const MoneroRPC = (function () {
     setNodes,
     getCustomNode,
     setCustomNode,
+    setActiveNetwork,
+    getActiveNetworkId,
     connect,
     disconnect,
     testNode,

@@ -38,6 +38,7 @@ require('../js/monero-wordlists-all.js');
 global.BIP39_WORDLIST  = require('../js/bip39-wordlist.js');
 global.Bip39           = require('../js/bip39.js');
 global.Polyseed        = require('../js/polyseed.js');
+global.Networks        = require('../js/networks.js');
 global.MoneroKeys      = require('../js/monero-keys.js');
 global.MoneroSubaddress = require('../js/monero-subaddress.js');
 global.WalletVault     = require('../js/wallet-vault.js');
@@ -209,6 +210,24 @@ function assertEq(actual, expected, msg) {
     const w = MoneroKeys.generateWallet('english', 'testnet');
     assert(w.address[0] === '9' || w.address[0] === 'A',
       'testnet prefix was: ' + w.address[0]);
+  });
+
+  await test('NONO mainnet address starts with N (prefix 127)', () => {
+    const w = MoneroKeys.generateWallet('english', 'nono-mainnet');
+    assertEq(w.network, 'nono-mainnet');
+    assertEq(w.address[0], 'N', 'NONO base58 prefix');
+    assertEq(w.address.length, 95);
+  });
+
+  await test('Same seed → different Monero vs NONO addresses', () => {
+    const seed = new Uint8Array(32);
+    seed[31] = 42;
+    const m = MoneroKeys.deriveFromSeed(seed, 'monero-mainnet');
+    const n = MoneroKeys.deriveFromSeed(seed, 'nono-mainnet');
+    assert(m.address !== n.address, 'addresses must differ');
+    assertEq(m.privateSpendKeyHex, n.privateSpendKeyHex, 'same spend key');
+    assertEq(m.address[0], '4');
+    assertEq(n.address[0], 'N');
   });
 
   // WalletVault
