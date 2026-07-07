@@ -104,13 +104,9 @@ const Networks = (function () {
       addressPrefix: 127,
       subaddressPrefix: 129,
       integratedPrefix: 128,
-      // NONO mainnet RPC (hostnames only — no raw VPS IPs in the wallet):
-      // 1) This VPS — nonod via nginx /api/rpc-nono → 127.0.0.1:24701
-      // 2) Genesis launch strand seed — public RPC on seed.nonoprivacy.com (DNS → launch node)
+      // NONO mainnet RPC (hostname only — no raw VPS IPs):
+      // This VPS — nonod via nginx /api/rpc-nono → 127.0.0.1:24701
       defaultRpcUrl: 'https://explorer.nonoprivacy.com/api/rpc-nono',
-      fallbackRpcUrls: [
-        'https://seed.nonoprivacy.com:24701',
-      ],
       rpcProxyPath: '/api/rpc-nono',
       defaultLwsUrl: '',
       lwsAvailable: false,
