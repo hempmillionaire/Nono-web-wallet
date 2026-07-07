@@ -38,9 +38,13 @@
     banner.innerHTML =
       '<svg width="18" height="18" fill="none" stroke="#22c55e" stroke-width="2" viewBox="0 0 24 24" style="flex-shrink:0"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>' +
       '<span style="flex:1;font-size:.82rem;color:var(--text)">An active wallet session is loaded in this tab.</span>' +
-      '<a href="/dashboard" style="flex-shrink:0;background:#22c55e;color:#fff;text-decoration:none;font-size:.78rem;font-weight:600;padding:8px 16px;border-radius:8px">Continue →</a>';
+      '<button type="button" id="btn-continue-session" style="flex-shrink:0;background:#22c55e;color:#fff;border:none;font-size:.78rem;font-weight:600;padding:8px 16px;border-radius:8px;cursor:pointer">Continue →</button>';
     const card = document.querySelector('.card');
     if (card) card.insertBefore(banner, card.firstChild);
+    const cont = document.getElementById('btn-continue-session');
+    if (cont) cont.addEventListener('click', function () {
+      window.location.href = '/dashboard.html';
+    });
   })();
 
   const formats = {
@@ -480,7 +484,7 @@
           try { sessionStorage.setItem('monero-web-fresh-wallet', '1'); } catch (e) {}
         }
         await WalletVault.store(vaultData, pw);
-        window.location.href = '/dashboard';
+        window.location.href = '/dashboard.html';
       });
     }
 
@@ -544,7 +548,11 @@
               if (!window._derivedKeys) return;
               const k = window._derivedKeys;
               const pw = $val('session-pw-create');
-              await WalletVault.store({
+              const btn = document.getElementById('btn-open-wallet-create');
+              try {
+                btn.disabled = true;
+                btn.textContent = 'Opening…';
+                await WalletVault.store({
                 address: k.address,
                 network: k.network,
                 privateSpendKeyHex: k.privateSpendKeyHex,
@@ -555,21 +563,18 @@
                 birthday:           (typeof k.birthday === 'number') ? k.birthday : null,
                 createdAtCurrentTip: true,
               }, pw);
-              // Signal the dashboard that this is a freshly-created wallet
-              // so it skips historical scanning. Two signals for redundancy:
-              // vault has createdAtCurrentTip=true, sessionStorage has this flag.
               try { sessionStorage.setItem('monero-web-fresh-wallet', '1'); } catch (e) {}
-              // Pre-register the wallet on the LWS with generated_locally=true
-              // BEFORE redirecting to the dashboard. This ensures the LWS
-              // creates the account starting from the current chain tip (no
-              // historical scan needed). The dashboard will see the account
-              // already exists and is "up to date" immediately.
-              try {
-                await LwsClient.login(k.address, k.privateViewKeyHex, { generatedLocally: true });
-              } catch (e) {
+              // LWS pre-register in background — do not block opening the dashboard
+              LwsClient.login(k.address, k.privateViewKeyHex, { generatedLocally: true }).catch(function (e) {
                 console.warn('[verify] pre-register on LWS failed (non-fatal):', e);
+              });
+              window.location.href = '/dashboard.html';
+              } catch (e) {
+                document.getElementById('error-msg').textContent = 'Could not save session: ' + (e.message || e);
+                document.getElementById('error-msg').classList.add('show');
+                btn.disabled = false;
+                btn.innerHTML = '<svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path d="M15 3h4a2 2 0 012 2v14a2 2 0 01-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/></svg> Open Wallet Dashboard';
               }
-              window.location.href = '/dashboard';
             });
           }
 

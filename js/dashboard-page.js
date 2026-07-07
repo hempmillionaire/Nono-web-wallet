@@ -34,7 +34,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   overlayForget.addEventListener('click', () => {
     WalletVault.clear();
     walletKeys = null;
-    window.location.href = '/verify';
+    window.location.href = '/verify.html';
   });
 
   overlayBtn.addEventListener('click', tryUnlock);
@@ -64,7 +64,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         <svg width="48" height="48" fill="none" stroke="var(--text-dim)" stroke-width="1.5" viewBox="0 0 24 24" style="margin-bottom:12px;opacity:.5"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
         <p style="color:var(--text);font-size:.95rem;font-weight:500;margin-bottom:6px">No wallet connected</p>
         <p style="color:var(--text-dim);font-size:.8rem;margin-bottom:20px">Enter your seed phrase or private key to access your wallet</p>
-        <a href="/verify" style="display:inline-block;padding:12px 28px;background:var(--xmr);color:#fff;text-decoration:none;border-radius:10px;font-weight:600;font-size:.85rem;box-shadow:0 4px 24px rgba(255,102,0,0.2)">Open Wallet →</a>
+        <a href="/verify.html" style="display:inline-block;padding:12px 28px;background:var(--xmr);color:#fff;text-decoration:none;border-radius:10px;font-weight:600;font-size:.85rem;box-shadow:0 4px 24px rgba(255,102,0,0.2)">Open Wallet →</a>
       </div>
     `;
     return;
@@ -103,7 +103,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       window.location.reload();
     } else {
       WalletVault.clear();
-      window.location.href = '/verify';
+      window.location.href = '/verify.html';
     }
   }
   function installIdleListeners() {

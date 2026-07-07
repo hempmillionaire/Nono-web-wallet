@@ -1,0 +1,8 @@
+# wallet.nonoprivacy.com — inside the 443 server block (before location /)
+
+    location = /dashboard {
+        rewrite ^ /dashboard.html last;
+    }
+    location = /verify {
+        rewrite ^ /verify.html last;
+    }
