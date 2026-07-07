@@ -90,6 +90,12 @@ const QrScanner = (function () {
    */
   function parseMoneroUri (text) {
     if (!text || typeof text !== 'string') return null;
+    if (/^nono:/i.test(text)) {
+      const without = text.replace(/^nono:/i, '');
+      const qIdx = without.indexOf('?');
+      const address = (qIdx >= 0 ? without.slice(0, qIdx) : without).trim();
+      return { raw: text, address, amount: null, paymentId: null, recipient: null, description: null };
+    }
     if (!/^monero:/i.test(text)) return null;
     const without = text.replace(/^monero:/i, '');
     const qIdx = without.indexOf('?');
@@ -138,11 +144,17 @@ const QrScanner = (function () {
     });
     if (code && code.data) {
       const parsed = parseMoneroUri(code.data);
-      if (opts.filter === 'any' || parsed) {
-        const result = parsed || {
+      const rawAddr = (code.data || '').trim();
+      const looksNono = /^N[1-9A-HJ-NP-Za-km-z]{90,}$/.test(rawAddr);
+      if (opts.filter === 'any' || parsed || looksNono) {
+        const result = parsed || (looksNono ? {
+          raw: rawAddr,
+          address: rawAddr,
+          amount: null, paymentId: null, recipient: null, description: null,
+        } : {
           raw: code.data,
           address: '', amount: null, paymentId: null, recipient: null, description: null,
-        };
+        });
         const cb = opts.onResult;
         stop();
         if (cb) cb(result);

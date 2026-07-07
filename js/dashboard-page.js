@@ -140,6 +140,26 @@ document.addEventListener('DOMContentLoaded', async () => {
   // ─── NONO network (single chain) ───
   walletKeys.network = Networks.resolve(walletKeys.network || Networks.getActiveId());
   Networks.setActiveId(walletKeys.network);
+
+  // Re-encode primary address with NONO prefix (127 → starts with N). Older sessions
+  // may have been stored with Monero mainnet netbyte (4…) while keys are valid.
+  try {
+    if (walletKeys.privateSpendKeyHex && !walletKeys.watchOnly) {
+      const fixed = MoneroKeys.deriveFromSpendKey(walletKeys.privateSpendKeyHex, walletKeys.network);
+      walletKeys.address = fixed.address;
+      walletKeys.publicSpendKeyHex = fixed.publicSpendKeyHex;
+      walletKeys.publicViewKeyHex = fixed.publicViewKeyHex;
+      walletKeys.privateViewKeyHex = fixed.privateViewKeyHex;
+    } else if (walletKeys.publicSpendKeyHex && walletKeys.publicViewKeyHex) {
+      const ps = MoneroKeys.hexToBytes(walletKeys.publicSpendKeyHex);
+      const pv = MoneroKeys.hexToBytes(walletKeys.publicViewKeyHex);
+      const nb = Networks.getAddressPrefix(walletKeys.network);
+      walletKeys.address = MoneroKeys.encodeAddress(nb, ps, pv);
+    }
+  } catch (e) {
+    console.warn('[dashboard] address re-encode:', e);
+  }
+
   let netCfg = Networks.get(walletKeys.network);
   const networkBadge = document.getElementById('network-badge');
   const balanceTicker = document.getElementById('balance-ticker');
@@ -281,10 +301,18 @@ document.addEventListener('DOMContentLoaded', async () => {
   // ─── Subaddress generator (full-mode only) ───
   // Reconstruct the raw byte buffers we need from the hex strings stored in
   // sessionStorage. The dashboard never sees the seed phrase — only the keys.
-  const subKeys = isWatchOnly ? null : {
-    privateViewKey: MoneroKeys.hexToBytes(walletKeys.privateViewKeyHex),
-    publicSpendKey: MoneroKeys.hexToBytes(walletKeys.publicSpendKeyHex)
-  };
+  const subKeys = isWatchOnly ? null : (function () {
+    if (!walletKeys.privateViewKeyHex || !walletKeys.publicSpendKeyHex) return null;
+    try {
+      return {
+        privateViewKey: MoneroKeys.hexToBytes(walletKeys.privateViewKeyHex),
+        publicSpendKey: MoneroKeys.hexToBytes(walletKeys.publicSpendKeyHex),
+      };
+    } catch (e) {
+      console.warn('[dashboard] subaddress keys unavailable:', e);
+      return null;
+    }
+  })();
   // ─── Subaddress book (persistent metadata + on-demand address derivation) ──
   // We persist {major, minor, label, createdAt} per wallet in localStorage so
   // the user's labeled subaddress book survives across sessions. The actual
@@ -426,11 +454,17 @@ document.addEventListener('DOMContentLoaded', async () => {
   ['spend', 'view'].forEach(type => {
     const toggle = document.getElementById('toggle-' + type);
     const value = document.getElementById('key-' + type);
+    if (!toggle || !value) return;
     toggle.addEventListener('click', (e) => {
       e.stopPropagation();
       const hidden = value.classList.toggle('hidden');
       toggle.textContent = hidden ? 'Show' : 'Hide';
     });
+  });
+
+  // Start RPC/LWS in background — do not block wiring buttons/modals below.
+  connectAndPopulate().catch(function (err) {
+    console.error('[dashboard] connect:', err);
   });
 
   // ─── XMR/USD price ───
@@ -937,8 +971,6 @@ document.addEventListener('DOMContentLoaded', async () => {
       ls.style.display = 'none';
     }
   }
-
-  await connectAndPopulate();
 
   // ─── RATE LIMIT MODAL ───
   function showRateLimitModal () {

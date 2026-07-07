@@ -263,7 +263,7 @@ const MoneroKeys = (function () {
       throw new Error('Bip39 module not loaded — include js/bip39.js first');
     }
     const seed = await Bip39.deriveSpendSeed(mnemonic, passphrase || '');
-    const result = deriveFromSeed(seed, network || 'mainnet');
+    const result = deriveFromSeed(seed, network || 'nono-mainnet');
     result.wordCount = mnemonic.trim().split(/\s+/).length;
     result.seedFormat = 'bip39';
     result.seedHex = bytesToHex(seed);
