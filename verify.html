@@ -172,7 +172,7 @@ footer p{font-size:.7rem;color:var(--text-dim)}
             <span>Advanced · custom NONO node</span>
           </summary>
           <div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border)">
-            <p style="font-size:.68rem;color:var(--text-dim);line-height:1.5;margin-bottom:8px">Override the default RPC (<code>explorer.nonoprivacy.com/api/rpc-nono</code>). Leave blank to use the default.</p>
+            <p style="font-size:.68rem;color:var(--text-dim);line-height:1.5;margin-bottom:8px">Default: this site’s <code>/api/rpc-nono</code> (HTTPS proxy to explorer). Override only if you run your own node with HTTPS + CORS.</p>
             <input id="adv-node-url" type="text" placeholder="https://explorer.nonoprivacy.com/api/rpc-nono" autocomplete="off" spellcheck="false" style="width:100%;background:var(--surface-2);border:1px solid var(--border);border-radius:8px;padding:8px 10px;color:var(--text);font-family:'JetBrains Mono',monospace;font-size:.72rem;outline:none;margin-bottom:6px">
             <div style="display:flex;gap:6px">
               <button id="adv-node-save" type="button" class="btn-secondary" style="flex:1;padding:8px;font-size:.72rem;background:var(--surface-2);border:1px solid var(--border);border-radius:8px;color:var(--text);cursor:pointer">Save</button>
@@ -381,7 +381,7 @@ footer p{font-size:.7rem;color:var(--text-dim)}
 <script src="js/monero-keys.js"></script>
 <script src="js/wallet-vault.js"></script>
 <script src="js/lws-client.js"></script>
-<script src="js/verify-page.nono.js?v=open1"></script>
+<script src="js/verify-page.nono.js?v=cont2"></script>
 <script src="js/monero-wordlists-all.js"></script>
 
 </body>

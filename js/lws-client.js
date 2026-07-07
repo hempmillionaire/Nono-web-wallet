@@ -102,6 +102,15 @@ const LwsClient = (function () {
     return !!BASE_URL;
   }
 
+  /** Cloudflare Worker front-end uses Turnstile + /session; direct monero-lws does not. */
+  function usesTurnstileSession () {
+    if (MOCK || !BASE_URL) return false;
+    if (/rosawands4\.workers\.dev/i.test(BASE_URL)) return true;
+    if (/\/api\/lws-nono/i.test(BASE_URL)) return false;
+    if (/nonoprivacy\.com\/api\/lws/i.test(BASE_URL)) return false;
+    return false;
+  }
+
   // ── Turnstile token management ────────────────────────────────────
   // Cloudflare Turnstile verifies the user is human. The token is
   // attached to every LWS request so the Worker proxy can validate it
@@ -152,7 +161,7 @@ const LwsClient = (function () {
 
   // ── Wait for Turnstile token ───────────────────────────────────────
   function waitForTurnstile () {
-    if (MOCK || _turnstileToken) return Promise.resolve();
+    if (MOCK || !usesTurnstileSession() || _turnstileToken) return Promise.resolve();
     return new Promise(function (resolve) {
       var elapsed = 0;
       var check = setInterval(function () {
@@ -173,7 +182,7 @@ const LwsClient = (function () {
   var _sessionPromise = null;
 
   function ensureSession () {
-    if (MOCK) return Promise.resolve();
+    if (MOCK || !usesTurnstileSession()) return Promise.resolve();
     if (_sessionToken) return Promise.resolve();
     if (_sessionPromise) return _sessionPromise;
     _sessionPromise = _initSession();
@@ -185,6 +194,7 @@ const LwsClient = (function () {
   // by _sessionToken/_sessionPromise) and non-fatal — on any failure the
   // lazy path in post() runs exactly as before.
   function prewarm () {
+    if (!usesTurnstileSession()) return;
     try { ensureSession(); } catch (e) {}
   }
 

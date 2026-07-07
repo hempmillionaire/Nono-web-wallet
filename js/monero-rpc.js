@@ -39,6 +39,13 @@ const MoneroRPC = (function () {
     activeNetworkId = cfg.id;
     PROXY_URL = cfg.rpcProxyPath || '/api/rpc-nono';
     CUSTOM_NODE_KEY = cfg.customNodeStorageKey || 'nono-web-node-url';
+    try {
+      const legacy = localStorage.getItem('monero-web-node-url');
+      if (legacy && !localStorage.getItem(CUSTOM_NODE_KEY)) {
+        localStorage.setItem(CUSTOM_NODE_KEY, legacy);
+        localStorage.removeItem('monero-web-node-url');
+      }
+    } catch (e) {}
     pinnedRpcBase = '';
     currentNode = null;
   }
@@ -66,9 +73,10 @@ const MoneroRPC = (function () {
   }
 
   async function jsonRpcToBase(base, method, params) {
+    const proxyBase = (PROXY_URL || '/api/rpc-nono').replace(/\/$/, '');
     const url = base
-      ? base + '/json_rpc'
-      : PROXY_URL + '?path=/json_rpc';
+      ? base.replace(/\/$/, '') + '/json_rpc'
+      : proxyBase + '/json_rpc';
     const body = { jsonrpc: '2.0', id: '0', method: method };
     if (params) body.params = params;
     const controller = new AbortController();
@@ -148,9 +156,10 @@ const MoneroRPC = (function () {
    */
   async function rpcOther(path, params, nodeUrl) {
     const base = getRpcBase();
+    const proxyBase = (PROXY_URL || '/api/rpc-nono').replace(/\/$/, '');
     const url = base
-      ? base + path
-      : PROXY_URL + '?path=' + encodeURIComponent(path);
+      ? base.replace(/\/$/, '') + path
+      : proxyBase + path;
 
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 15000);

@@ -38,13 +38,9 @@
     banner.innerHTML =
       '<svg width="18" height="18" fill="none" stroke="#22c55e" stroke-width="2" viewBox="0 0 24 24" style="flex-shrink:0"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>' +
       '<span style="flex:1;font-size:.82rem;color:var(--text)">An active wallet session is loaded in this tab.</span>' +
-      '<button type="button" id="btn-continue-session" style="flex-shrink:0;background:#22c55e;color:#fff;border:none;font-size:.78rem;font-weight:600;padding:8px 16px;border-radius:8px;cursor:pointer">Continue →</button>';
+      '<a href="/dashboard.html" id="btn-continue-session" style="flex-shrink:0;background:#22c55e;color:#fff;text-decoration:none;font-size:.78rem;font-weight:600;padding:8px 16px;border-radius:8px;cursor:pointer;position:relative;z-index:2">Continue →</a>';
     const card = document.querySelector('.card');
     if (card) card.insertBefore(banner, card.firstChild);
-    const cont = document.getElementById('btn-continue-session');
-    if (cont) cont.addEventListener('click', function () {
-      window.location.href = '/dashboard.html';
-    });
   })();
 
   const formats = {
