@@ -1,0 +1,15 @@
+[Unit]
+Description=NONO light wallet server (monero-lws)
+After=network.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=root
+ExecStart=/root/monero-lws/build/src/monero-lws-daemon --config-file /root/.nono-lws/nono-lws.conf
+Restart=on-failure
+RestartSec=15
+LimitNOFILE=65536
+
+[Install]
+WantedBy=multi-user.target
