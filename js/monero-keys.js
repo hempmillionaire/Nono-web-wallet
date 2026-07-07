@@ -100,7 +100,7 @@ const MoneroKeys = (function () {
   }
 
   function deriveFromMnemonic(mnemonic, lang, network) {
-    network = network || 'mainnet';
+    network = network || 'nono-mainnet';
 
     const words = mnemonic.trim().toLowerCase().split(/\s+/);
     const count = words.length;
@@ -279,7 +279,7 @@ const MoneroKeys = (function () {
       throw new Error('Polyseed module not loaded — include js/polyseed.js first');
     }
     const ps = await Polyseed.deriveSeed(mnemonic);
-    const result = deriveFromSeed(ps.seed, network || 'mainnet');
+    const result = deriveFromSeed(ps.seed, network || 'nono-mainnet');
     result.wordCount = 16;
     result.seedFormat = 'polyseed';
     result.birthday = ps.birthday;

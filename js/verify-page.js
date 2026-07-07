@@ -32,7 +32,7 @@ document.addEventListener('DOMContentLoaded', () => {
     12: { name:'BIP-39',          cls:'mymonero', icon:'◇' },
     13: { name:'MyMonero Legacy', cls:'mymonero', icon:'◈' },
     16: { name:'Polyseed',        cls:'mymonero', icon:'◉' },
-    25: { name:'Monero Standard', cls:'standard', icon:'◆' },
+    25: { name:'NONO Standard (25-word)', cls:'standard', icon:'◆' },
   };
 
   // ─── Advanced: custom Monero node URL ───
@@ -103,14 +103,32 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   // ─── TABS ───
-  document.querySelectorAll('.tab').forEach(tab => {
-    tab.addEventListener('click', () => {
-      document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-      document.querySelectorAll('.form-section').forEach(f => f.classList.remove('active'));
-      tab.classList.add('active');
-      document.getElementById('tab-' + tab.dataset.tab).classList.add('active');
-      document.getElementById('results').classList.remove('show');
-      document.getElementById('error-msg').classList.remove('show');
+  function switchTab (tabName) {
+    const panel = document.getElementById('tab-' + tabName);
+    if (!panel) {
+      console.warn('[verify] unknown tab:', tabName);
+      return;
+    }
+    document.querySelectorAll('.tabs .tab').forEach((t) => {
+      t.classList.toggle('active', t.dataset.tab === tabName);
+    });
+    document.querySelectorAll('.form-section').forEach((f) => f.classList.remove('active'));
+    panel.classList.add('active');
+    const resultsEl = document.getElementById('results');
+    const errorEl = document.getElementById('error-msg');
+    if (resultsEl) resultsEl.classList.remove('show');
+    if (errorEl) errorEl.classList.remove('show');
+    const createResult = document.getElementById('create-result');
+    if (createResult && tabName !== 'create') createResult.style.display = 'none';
+  }
+
+  document.querySelectorAll('.tabs .tab').forEach((tab) => {
+    tab.setAttribute('type', 'button');
+    tab.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const name = tab.dataset.tab;
+      if (name) switchTab(name);
     });
   });
 
@@ -122,20 +140,25 @@ document.addEventListener('DOMContentLoaded', () => {
   const btnSeed = document.getElementById('btn-derive-seed');
 
   function refreshDeriveBtn() {
+    if (!seedInput || !wcNum || !btnSeed) return;
     var words = seedInput.value.trim().split(/\s+/).filter(function(w) { return w.length > 0; });
     var count = words.length;
     wcNum.textContent = count;
-    wordCounter.classList.remove('valid');
-    seedFormat.style.display = 'none';
-    seedFormat.className = 'seed-format-badge';
+    if (wordCounter) wordCounter.classList.remove('valid');
+    if (seedFormat) {
+      seedFormat.style.display = 'none';
+      seedFormat.className = 'seed-format-badge';
+    }
     btnSeed.disabled = true;
 
     var fmt = formats[count];
     if (fmt) {
-      wordCounter.classList.add('valid');
-      seedFormat.style.display = 'inline-block';
-      seedFormat.classList.add(fmt.cls);
-      seedFormat.textContent = fmt.icon + ' ' + fmt.name;
+      if (wordCounter) wordCounter.classList.add('valid');
+      if (seedFormat) {
+        seedFormat.style.display = 'inline-block';
+        seedFormat.classList.add(fmt.cls);
+        seedFormat.textContent = fmt.icon + ' ' + fmt.name;
+      }
       // Polyseed (16 words) has embedded birthday — no age selection needed.
       // For all other formats, require a wallet-age button click first.
       if (count === 16 || walletAgeSelected) {
@@ -143,10 +166,12 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     }
     // BIP-39 passphrase row only shown for 12-word seeds
-    document.getElementById('bip39-pass-group').style.display =
-      (count === 12) ? 'block' : 'none';
+    const bip39Grp = document.getElementById('bip39-pass-group');
+    if (bip39Grp) bip39Grp.style.display = (count === 12) ? 'block' : 'none';
   }
-  seedInput.addEventListener('input', refreshDeriveBtn);
+  if (seedInput) {
+    seedInput.addEventListener('input', refreshDeriveBtn);
+  }
 
   // ─── WALLET AGE BUTTONS → restore height ───
   // Each button computes an approximate block height based on how old the
@@ -185,7 +210,7 @@ document.addEventListener('DOMContentLoaded', () => {
       });
       // Highlight the clicked button
       btn.style.background = 'var(--xmr-dim)';
-      btn.style.borderColor = 'rgba(255,102,0,0.4)';
+      btn.style.borderColor = 'var(--border-focus)';
       btn.style.color = 'var(--xmr)';
       // Re-evaluate derive button state
       refreshDeriveBtn();
@@ -208,7 +233,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Auto-hide the wallet-age section for polyseed (birthday is embedded)
   // and show it for all other formats. Also hide for BIP-39 passphrase row.
-  seedInput.addEventListener('input', function() {
+  seedInput && seedInput.addEventListener('input', function() {
     var words = seedInput.value.trim().split(/\s+/).filter(function(w) { return w.length > 0; });
     var count = words.length;
     var rhGroup = $el('restore-height-group');
@@ -223,23 +248,27 @@ document.addEventListener('DOMContentLoaded', () => {
   const spendKeyInput = document.getElementById('spend-key-input');
   const btnKey = document.getElementById('btn-derive-key');
 
-  spendKeyInput.addEventListener('input', () => {
-    btnKey.disabled = !/^[0-9a-fA-F]{64}$/.test(spendKeyInput.value.trim());
-  });
+  if (spendKeyInput && btnKey) {
+    spendKeyInput.addEventListener('input', () => {
+      btnKey.disabled = !/^[0-9a-fA-F]{64}$/.test(spendKeyInput.value.trim());
+    });
+  }
 
   // ─── WATCH-ONLY INPUT ───
   const watchAddr = document.getElementById('watch-addr');
   const watchView = document.getElementById('watch-view');
   const btnWatch  = document.getElementById('btn-derive-watch');
   function refreshWatchBtn() {
-    const addrOk = /^[1-9A-HJ-NP-Za-km-z]{95,106}$/.test(watchAddr.value.trim());
+    if (!watchAddr || !watchView || !btnWatch) return;
+    const addr = watchAddr.value.trim();
+    const addrOk = /^[1-9A-HJ-NP-Za-km-z]{95,106}$/.test(addr);
     const viewOk = /^[0-9a-fA-F]{64}$/.test(watchView.value.trim());
     btnWatch.disabled = !(addrOk && viewOk);
   }
-  watchAddr.addEventListener('input', refreshWatchBtn);
-  watchView.addEventListener('input', refreshWatchBtn);
+  if (watchAddr) watchAddr.addEventListener('input', refreshWatchBtn);
+  if (watchView) watchView.addEventListener('input', refreshWatchBtn);
 
-  btnWatch.addEventListener('click', () => {
+  if (btnWatch) btnWatch.addEventListener('click', () => {
     const errorEl = document.getElementById('error-msg');
     const resultsEl = document.getElementById('results');
     errorEl.classList.remove('show');
@@ -279,7 +308,7 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   // ─── DERIVE FROM SEED ───
-  btnSeed.addEventListener('click', () => {
+  if (btnSeed) btnSeed.addEventListener('click', () => {
     const errorEl = document.getElementById('error-msg');
     const resultsEl = document.getElementById('results');
     errorEl.classList.remove('show');
@@ -313,7 +342,7 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   // ─── DERIVE FROM KEY ───
-  btnKey.addEventListener('click', () => {
+  if (btnKey) btnKey.addEventListener('click', () => {
     const errorEl = document.getElementById('error-msg');
     const resultsEl = document.getElementById('results');
     errorEl.classList.remove('show');
@@ -529,7 +558,7 @@ document.addEventListener('DOMContentLoaded', () => {
               var url = URL.createObjectURL(blob);
               var a = document.createElement('a');
               a.href = url;
-              a.download = 'monero-wallet-' + wallet.address.slice(0, 8) + '.json';
+              a.download = 'nono-wallet-' + wallet.address.slice(0, 8) + '.json';
               a.click();
               URL.revokeObjectURL(url);
             });

@@ -186,10 +186,10 @@ footer p{font-size:.7rem;color:var(--text-dim)}
         </details>
 
         <div class="tabs">
-          <button class="tab active" data-tab="seed">Seed Phrase</button>
-          <button class="tab" data-tab="keys">Private Spend Key</button>
-          <button class="tab" data-tab="watch">Watch-Only</button>
-          <button class="tab" data-tab="create">Create New</button>
+          <button type="button" class="tab active" data-tab="seed">Seed Phrase</button>
+          <button type="button" class="tab" data-tab="keys">Private Spend Key</button>
+          <button type="button" class="tab" data-tab="watch">Watch-Only</button>
+          <button type="button" class="tab" data-tab="create">Create New</button>
         </div>
 
         <!-- SEED TAB -->
@@ -258,8 +258,8 @@ footer p{font-size:.7rem;color:var(--text-dim)}
         <!-- WATCH-ONLY TAB -->
         <div class="form-section" id="tab-watch">
           <div class="input-group">
-            <label>Wallet Address <span class="hint">95 chars · starts with 4, 5, 8, 9 or A</span></label>
-            <input type="text" id="watch-addr" placeholder="4..." spellcheck="false" autocomplete="off">
+            <label>Wallet Address <span class="hint">95 chars · NONO addresses start with N</span></label>
+            <input type="text" id="watch-addr" placeholder="N..." spellcheck="false" autocomplete="off">
           </div>
           <div class="input-group">
             <label>Private View Key <span class="hint">64-character hex</span></label>
@@ -337,10 +337,10 @@ footer p{font-size:.7rem;color:var(--text-dim)}
           <div class="result-card" id="res-mnemonic-card" style="display:none;border-color:rgba(255,102,0,0.2);background:rgba(255,102,0,0.04)">
             <div class="result-label" style="color:var(--xmr)">Recovered 25-word Mnemonic <button class="copy-btn" data-target="res-mnemonic">Copy</button></div>
             <div class="result-value" id="res-mnemonic" style="font-size:.78rem;line-height:1.9;color:var(--text);word-spacing:.15em"></div>
-            <div style="font-size:.7rem;color:var(--text-dim);margin-top:8px;line-height:1.5">The standard Monero 25-word phrase is a reversible encoding of your spend key — write this down for backup.</div>
+            <div style="font-size:.7rem;color:var(--text-dim);margin-top:8px;line-height:1.5">The standard 25-word phrase is a reversible encoding of your spend key — write this down for backup.</div>
           </div>
           <div class="result-card">
-            <div class="result-label">Monero Address <button class="copy-btn" data-target="res-address">Copy</button></div>
+            <div class="result-label">NONO Address <button class="copy-btn" data-target="res-address">Copy</button></div>
             <div class="result-value address" id="res-address"></div>
           </div>
           <div class="result-card">
@@ -367,7 +367,7 @@ footer p{font-size:.7rem;color:var(--text-dim)}
 
   <footer>
     <div class="container">
-      <p>monero-web.com — Open source · MIT License · Your keys never leave your browser · <a href="/privacy" style="color:inherit;text-decoration:underline">Privacy</a> · <a href="https://github.com/Medtabka/monero-web" target="_blank" rel="noopener" style="color:inherit;text-decoration:underline">GitHub</a></p>
+      <p>NONO Wallet · wallet.nonoprivacy.com · Open source · MIT · Keys stay in your browser · <a href="https://github.com/hempmillionaire/Nono-web-wallet" target="_blank" rel="noopener" style="color:inherit;text-decoration:underline">GitHub</a></p>
     </div>
   </footer>
 </div>
@@ -386,7 +386,6 @@ footer p{font-size:.7rem;color:var(--text-dim)}
 <script src="js/monero-english-wordlist.js"></script>
 <script src="js/monero-wordlists-all.js"></script>
 <script src="js/verify-page.js"></script>
-<script src="js/swap-popup.js" defer></script>
 
 </body>
 </html>
