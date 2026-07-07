@@ -303,6 +303,37 @@ const MoneroKeys = (function () {
     return deriveFromMnemonic(mnemonic, lang, network);
   }
 
+  /**
+   * Re-derive primary address + public keys for the active NONO network.
+   * Fixes sessions that still carry a Monero-style (4…) address from prefix 18.
+   */
+  function normalizeForNetwork(keys, networkIdOrLegacy) {
+    if (!keys || keys.watchOnly) return keys;
+    const netId = (typeof Networks !== 'undefined')
+      ? Networks.resolve(networkIdOrLegacy || keys.network || 'nono-mainnet')
+      : (networkIdOrLegacy || keys.network || 'nono-mainnet');
+    keys.network = netId;
+    try {
+      if (keys.privateSpendKeyHex) {
+        const fixed = deriveFromSpendKey(keys.privateSpendKeyHex, netId);
+        keys.address = fixed.address;
+        keys.publicSpendKeyHex = fixed.publicSpendKeyHex;
+        keys.publicViewKeyHex = fixed.publicViewKeyHex;
+        keys.privateViewKeyHex = fixed.privateViewKeyHex;
+      } else if (keys.publicSpendKeyHex && keys.publicViewKeyHex) {
+        const ps = hexToBytes(keys.publicSpendKeyHex);
+        const pv = hexToBytes(keys.publicViewKeyHex);
+        const nb = (typeof Networks !== 'undefined')
+          ? Networks.getAddressPrefix(netId)
+          : 127;
+        keys.address = encodeAddress(nb, ps, pv);
+      }
+    } catch (e) {
+      console.warn('[MoneroKeys] normalizeForNetwork:', e);
+    }
+    return keys;
+  }
+
   return {
     deriveFromSeed,
     deriveFromMnemonic,
@@ -311,6 +342,7 @@ const MoneroKeys = (function () {
     deriveFromAnyMnemonic,
     deriveFromSpendKey,
     generateWallet,
+    normalizeForNetwork,
     encodeAddress,
     bytesToHex,
     hexToBytes

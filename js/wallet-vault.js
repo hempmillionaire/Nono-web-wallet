@@ -111,6 +111,15 @@ const WalletVault = (function () {
     return b.keys;
   }
 
+  /** Overwrite keys in a plaintext vault (same session, no password). */
+  function updatePlain(keys) {
+    const b = readBlob();
+    if (!b || b.encrypted) return false;
+    b.keys = keys;
+    sessionStorage.setItem(STORAGE_KEY, JSON.stringify(b));
+    return true;
+  }
+
   /**
    * Decrypt an encrypted blob with the supplied password.
    * Throws on wrong password / corrupted ciphertext.
@@ -136,7 +145,7 @@ const WalletVault = (function () {
     sessionStorage.removeItem(STORAGE_KEY);
   }
 
-  return { store, hasBlob, isLocked, readPlain, unlock, clear };
+  return { store, hasBlob, isLocked, readPlain, updatePlain, unlock, clear };
 })();
 
 if (typeof module !== 'undefined' && module.exports) module.exports = WalletVault;

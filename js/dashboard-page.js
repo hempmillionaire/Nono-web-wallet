@@ -46,6 +46,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     overlayBtn.textContent = 'Unlocking…';
     try {
       walletKeys = await WalletVault.unlock(overlayPw.value);
+      if (typeof MoneroKeys !== 'undefined' && MoneroKeys.normalizeForNetwork) {
+        MoneroKeys.normalizeForNetwork(walletKeys, 'nono-mainnet');
+      }
       hideUnlock();
       initDashboard();
     } catch (e) {
@@ -140,24 +143,9 @@ document.addEventListener('DOMContentLoaded', async () => {
   // ─── NONO network (single chain) ───
   walletKeys.network = Networks.resolve(walletKeys.network || Networks.getActiveId());
   Networks.setActiveId(walletKeys.network);
-
-  // Re-encode primary address with NONO prefix (127 → starts with N). Older sessions
-  // may have been stored with Monero mainnet netbyte (4…) while keys are valid.
-  try {
-    if (walletKeys.privateSpendKeyHex && !walletKeys.watchOnly) {
-      const fixed = MoneroKeys.deriveFromSpendKey(walletKeys.privateSpendKeyHex, walletKeys.network);
-      walletKeys.address = fixed.address;
-      walletKeys.publicSpendKeyHex = fixed.publicSpendKeyHex;
-      walletKeys.publicViewKeyHex = fixed.publicViewKeyHex;
-      walletKeys.privateViewKeyHex = fixed.privateViewKeyHex;
-    } else if (walletKeys.publicSpendKeyHex && walletKeys.publicViewKeyHex) {
-      const ps = MoneroKeys.hexToBytes(walletKeys.publicSpendKeyHex);
-      const pv = MoneroKeys.hexToBytes(walletKeys.publicViewKeyHex);
-      const nb = Networks.getAddressPrefix(walletKeys.network);
-      walletKeys.address = MoneroKeys.encodeAddress(nb, ps, pv);
-    }
-  } catch (e) {
-    console.warn('[dashboard] address re-encode:', e);
+  if (typeof MoneroKeys.normalizeForNetwork === 'function') {
+    MoneroKeys.normalizeForNetwork(walletKeys, walletKeys.network);
+    try { WalletVault.updatePlain(walletKeys); } catch (e) {}
   }
 
   let netCfg = Networks.get(walletKeys.network);

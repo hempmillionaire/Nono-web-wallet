@@ -405,6 +405,9 @@
 
   // ─── SHOW RESULTS ───
   function showResults(keys) {
+    if (typeof MoneroKeys.normalizeForNetwork === 'function') {
+      MoneroKeys.normalizeForNetwork(keys, getSelectedNetworkId());
+    }
     // Reveal the recovered mnemonic card only when we have one (spend-key
     // import paths attach it; BIP-39 / polyseed / MyMonero don't because
     // those formats are one-way and can't be reconstructed from the keys)
@@ -431,7 +434,7 @@
     }
     if (netEl && typeof Networks !== 'undefined') {
       const cfg = Networks.get(keys.network || getSelectedNetworkId());
-      netEl.textContent = 'Network: ' + cfg.displayName + ' · ' + cfg.ticker + ' (' + cfg.expectedAddressHint + ')';
+      netEl.textContent = 'Network: ' + cfg.displayName + ' · ' + cfg.ticker + ' · address ' + (keys.address ? keys.address[0] + '…' : '?') + ' (' + cfg.expectedAddressHint + ')';
     }
 
     if (keys.wordCount) {
