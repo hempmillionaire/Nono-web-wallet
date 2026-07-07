@@ -81,6 +81,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     return; // initDashboard() will run after successful unlock
   } else {
     walletKeys = WalletVault.readPlain();
+    if (walletKeys && typeof MoneroKeys !== 'undefined' && MoneroKeys.normalizeForNetwork) {
+      MoneroKeys.normalizeForNetwork(walletKeys, 'nono-mainnet');
+      try { WalletVault.updatePlain(walletKeys); } catch (e) {}
+    }
     initDashboard();
     return;
   }

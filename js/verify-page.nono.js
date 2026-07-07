@@ -71,6 +71,26 @@
     return 'nono-mainnet';
   }
 
+  function vaultPayloadFromKeys (k) {
+    var data = {
+      address: k.address,
+      network: k.network || getSelectedNetworkId(),
+      privateSpendKeyHex: k.privateSpendKeyHex,
+      privateViewKeyHex:  k.privateViewKeyHex,
+      publicSpendKeyHex:  k.publicSpendKeyHex,
+      publicViewKeyHex:   k.publicViewKeyHex,
+      watchOnly:          !!k.watchOnly,
+      seedFormat:         k.seedFormat || null,
+      birthday:           (typeof k.birthday === 'number') ? k.birthday : null,
+      restoreHeight:      (typeof k.restoreHeight === 'number') ? k.restoreHeight : null,
+    };
+    if (k.createdAtCurrentTip) data.createdAtCurrentTip = true;
+    if (typeof MoneroKeys !== 'undefined' && MoneroKeys.normalizeForNetwork) {
+      MoneroKeys.normalizeForNetwork(data, data.network);
+    }
+    return data;
+  }
+
   function getNodeStorageKey () {
     try {
       if (typeof Networks === 'undefined') return 'nono-web-node-url';
@@ -465,24 +485,11 @@
         if (!window._derivedKeys) return;
         const k = window._derivedKeys;
         const pw = $val('session-pw');
-        var vaultData = {
-          address: k.address,
-          network: k.network,
-          privateSpendKeyHex: k.privateSpendKeyHex,
-          privateViewKeyHex:  k.privateViewKeyHex,
-          publicSpendKeyHex:  k.publicSpendKeyHex,
-          publicViewKeyHex:   k.publicViewKeyHex,
-          watchOnly:          !!k.watchOnly,
-          seedFormat:         k.seedFormat || null,
-          birthday:           (typeof k.birthday === 'number') ? k.birthday : null,
-          restoreHeight:      (typeof k.restoreHeight === 'number') ? k.restoreHeight : null,
-        };
-        // Preserve the freshly-created flag if set (from Generate New flow)
-        if (k.createdAtCurrentTip) {
-          vaultData.createdAtCurrentTip = true;
+        var vaultData = vaultPayloadFromKeys(k);
+        await WalletVault.store(vaultData, pw);
+        if (vaultData.createdAtCurrentTip) {
           try { sessionStorage.setItem('monero-web-fresh-wallet', '1'); } catch (e) {}
         }
-        await WalletVault.store(vaultData, pw);
         window.location.href = '/dashboard.html';
       });
     }
@@ -516,6 +523,9 @@
             $val('create-lang') || 'english',
             getSelectedNetworkId()
           );
+          if (typeof MoneroKeys.normalizeForNetwork === 'function') {
+            MoneroKeys.normalizeForNetwork(wallet, getSelectedNetworkId());
+          }
 
           document.getElementById('create-mnemonic').textContent = wallet.mnemonic;
           document.getElementById('create-address').textContent = wallet.address;
@@ -551,20 +561,11 @@
               try {
                 btn.disabled = true;
                 btn.textContent = 'Opening…';
-                await WalletVault.store({
-                address: k.address,
-                network: k.network,
-                privateSpendKeyHex: k.privateSpendKeyHex,
-                privateViewKeyHex:  k.privateViewKeyHex,
-                publicSpendKeyHex:  k.publicSpendKeyHex,
-                publicViewKeyHex:   k.publicViewKeyHex,
-                seedFormat:         k.seedFormat || null,
-                birthday:           (typeof k.birthday === 'number') ? k.birthday : null,
-                createdAtCurrentTip: true,
-              }, pw);
+                var openPayload = vaultPayloadFromKeys(k);
+                await WalletVault.store(openPayload, pw);
               try { sessionStorage.setItem('monero-web-fresh-wallet', '1'); } catch (e) {}
               // LWS pre-register in background — do not block opening the dashboard
-              LwsClient.login(k.address, k.privateViewKeyHex, { generatedLocally: true }).catch(function (e) {
+              LwsClient.login(openPayload.address, openPayload.privateViewKeyHex, { generatedLocally: true }).catch(function (e) {
                 console.warn('[verify] pre-register on LWS failed (non-fatal):', e);
               });
               window.location.href = '/dashboard.html';

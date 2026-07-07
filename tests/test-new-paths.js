@@ -215,6 +215,25 @@ function assertEq(actual, expected, msg) {
     assertEq(w.address[0], 'N');
   });
 
+  await test('normalizeForNetwork fixes Monero-style 4… to NONO N…', () => {
+    const spend = '4d592344de123b00fa0f605c41d4fa545795c45c4765499e410ad76f0a66f409';
+    const moneroStyle = MoneroKeys.encodeAddress(18,
+      MoneroKeys.hexToBytes(MoneroKeys.deriveFromSpendKey(spend, 'nono-mainnet').publicSpendKeyHex),
+      MoneroKeys.hexToBytes(MoneroKeys.deriveFromSpendKey(spend, 'nono-mainnet').publicViewKeyHex));
+    const keys = {
+      address: moneroStyle,
+      network: 'nono-mainnet',
+      privateSpendKeyHex: spend,
+      privateViewKeyHex: MoneroKeys.deriveFromSpendKey(spend, 'nono-mainnet').privateViewKeyHex,
+      publicSpendKeyHex: MoneroKeys.deriveFromSpendKey(spend, 'nono-mainnet').publicSpendKeyHex,
+      publicViewKeyHex: MoneroKeys.deriveFromSpendKey(spend, 'nono-mainnet').publicViewKeyHex,
+    };
+    assertEq(moneroStyle[0], '4', 'fixture is Monero netbyte');
+    MoneroKeys.normalizeForNetwork(keys, 'nono-mainnet');
+    assertEq(keys.address[0], 'N', 'after normalize');
+    assertEq(keys.address.length, 95);
+  });
+
   await test('NONO formatAtomic uses 10 decimals', () => {
     assertEq(Networks.formatAtomic(10000000000n, 'nono-mainnet'), '1');
     assertEq(Networks.formatAtomic(15000000000n, 'nono-mainnet'), '1.5');
