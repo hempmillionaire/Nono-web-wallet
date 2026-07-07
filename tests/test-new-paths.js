@@ -230,6 +230,17 @@ function assertEq(actual, expected, msg) {
     assertEq(n.address[0], 'N');
   });
 
+  await test('NONO formatAtomic uses 10 decimals', () => {
+    assertEq(Networks.formatAtomic(10000000000n, 'nono-mainnet'), '1');
+    assertEq(Networks.formatAtomic(15000000000n, 'nono-mainnet'), '1.5');
+    assertEq(Networks.parseAtomic('1.5', 'nono-mainnet'), 15000000000n);
+  });
+
+  await test('Monero formatAtomic uses 12 decimals', () => {
+    assertEq(Networks.formatAtomic(1000000000000n, 'monero-mainnet'), '1');
+    assertEq(Networks.parseAtomic('0.000001', 'monero-mainnet'), 1000000n);
+  });
+
   // WalletVault
   await test('WalletVault plaintext round-trip', async () => {
     sessionStorage.clear();

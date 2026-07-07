@@ -31,6 +31,8 @@ const MoneroRPC = (function () {
   let CUSTOM_NODE_KEY = 'monero-web-node-url:monero-mainnet';
   let activeNetworkId = 'monero-mainnet';
 
+  let pinnedRpcBase = '';
+
   function setActiveNetwork(networkIdOrLegacy) {
     if (typeof Networks === 'undefined') return;
     const cfg = Networks.get(networkIdOrLegacy);
@@ -42,8 +44,8 @@ const MoneroRPC = (function () {
       PROXY_URL = cfg.rpcProxyPath || '/api/proxy';
     }
     CUSTOM_NODE_KEY = cfg.customNodeStorageKey || 'monero-web-node-url';
+    pinnedRpcBase = '';
     currentNode = null;
-    // One-time migration: legacy single key → monero-mainnet key
     if (cfg.id === 'monero-mainnet') {
       try {
         const legacy = localStorage.getItem('monero-web-node-url');
@@ -60,6 +62,50 @@ const MoneroRPC = (function () {
 
   function getCustomNode() {
     try { return localStorage.getItem(CUSTOM_NODE_KEY) || ''; } catch (e) { return ''; }
+  }
+
+  /**
+   * Direct node base URL: custom override, then Networks.defaultRpcUrl, else '' → use PROXY_URL.
+   */
+  function getRpcBase() {
+    const custom = getCustomNode();
+    if (custom) return custom.replace(/\/$/, '');
+    if (pinnedRpcBase) return pinnedRpcBase;
+    if (typeof Networks !== 'undefined') {
+      const eff = Networks.getEffectiveRpcUrl(activeNetworkId);
+      if (eff) return eff;
+    }
+    return '';
+  }
+
+  async function jsonRpcToBase(base, method, params) {
+    const url = base
+      ? base + '/json_rpc'
+      : PROXY_URL + '?path=/json_rpc';
+    const body = { jsonrpc: '2.0', id: '0', method: method };
+    if (params) body.params = params;
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 15000);
+    try {
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+        signal: controller.signal,
+      });
+      clearTimeout(timeout);
+      if (!response.ok) {
+        throw new Error(`Proxy HTTP error: ${response.status} ${response.statusText}`);
+      }
+      const data = await response.json();
+      if (data.error) {
+        throw new Error(`RPC error: ${data.error.message || JSON.stringify(data.error)}`);
+      }
+      return data.result;
+    } catch (e) {
+      clearTimeout(timeout);
+      throw e;
+    }
   }
   function setCustomNode(url) {
     try {
@@ -106,53 +152,17 @@ const MoneroRPC = (function () {
    * Core JSON-RPC call via proxy
    */
   async function jsonRpc(method, params, nodeUrl) {
-    const custom = getCustomNode();
-    const url = custom
-      ? custom + '/json_rpc'
-      : PROXY_URL + '?path=/json_rpc';
-    const body = {
-      jsonrpc: '2.0',
-      id: '0',
-      method: method,
-    };
-    if (params) body.params = params;
-
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 15000);
-
-    try {
-      const response = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-        signal: controller.signal,
-      });
-      clearTimeout(timeout);
-
-      if (!response.ok) {
-        throw new Error(`Proxy HTTP error: ${response.status} ${response.statusText}`);
-      }
-
-      const data = await response.json();
-      if (data.error) {
-        throw new Error(`RPC error: ${data.error.message || JSON.stringify(data.error)}`);
-      }
-
-      return data.result;
-    } catch(e) {
-      clearTimeout(timeout);
-      if (e.name === 'AbortError') throw new Error('Request timed out');
-      throw e;
-    }
+    const base = getRpcBase();
+    return jsonRpcToBase(base, method, params);
   }
 
   /**
    * Core call to non-JSON-RPC endpoints (like /send_raw_transaction)
    */
   async function rpcOther(path, params, nodeUrl) {
-    const custom = getCustomNode();
-    const url = custom
-      ? custom + path
+    const base = getRpcBase();
+    const url = base
+      ? base + path
       : PROXY_URL + '?path=' + encodeURIComponent(path);
 
     const controller = new AbortController();
@@ -215,14 +225,31 @@ const MoneroRPC = (function () {
 
     try {
       const start = Date.now();
-      const info = await jsonRpc('get_info');
+      const bases = (typeof Networks !== 'undefined')
+        ? Networks.getEffectiveRpcUrlList(activeNetworkId)
+        : [];
+      const tryBases = bases.length ? bases : [''];
+      let info = null;
+      let usedBase = '';
+      let lastErr = null;
+      for (const base of tryBases) {
+        try {
+          info = await jsonRpcToBase(base, 'get_info');
+          usedBase = base;
+          pinnedRpcBase = base;
+          break;
+        } catch (e) {
+          lastErr = e;
+        }
+      }
+      if (!info) throw lastErr || new Error('No RPC reachable');
       const latency = Date.now() - start;
 
       currentNode = {
         name: (typeof Networks !== 'undefined')
           ? (Networks.get(activeNetworkId).displayName + ' RPC')
           : 'monero-web proxy',
-        url: PROXY_URL,
+        url: usedBase || PROXY_URL,
         ok: true,
         latency,
         height: info.height,
@@ -336,10 +363,13 @@ const MoneroRPC = (function () {
   }
 
   /**
-   * Format atomic units (piconero) to XMR display string
-   * 1 XMR = 1e12 piconero
+   * Format atomic units for display (decimals from active network via Networks).
    */
-  function formatXMR(atomicUnits) {
+  function formatXMR(atomicUnits, networkId) {
+    const id = networkId || activeNetworkId;
+    if (typeof Networks !== 'undefined') {
+      return Networks.formatAtomic(atomicUnits, id);
+    }
     if (typeof atomicUnits === 'string') atomicUnits = BigInt(atomicUnits);
     if (typeof atomicUnits === 'number') atomicUnits = BigInt(Math.round(atomicUnits));
     const xmr = Number(atomicUnits) / 1e12;
@@ -347,9 +377,13 @@ const MoneroRPC = (function () {
   }
 
   /**
-   * Parse XMR amount string to atomic units
+   * Parse display amount to atomic units (decimals from active network).
    */
-  function parseXMR(xmrString) {
+  function parseXMR(xmrString, networkId) {
+    const id = networkId || activeNetworkId;
+    if (typeof Networks !== 'undefined') {
+      return Networks.parseAtomic(xmrString, id);
+    }
     const parts = xmrString.split('.');
     const whole = BigInt(parts[0] || '0');
     const frac = (parts[1] || '').padEnd(12, '0').substring(0, 12);

@@ -751,7 +751,7 @@ document.addEventListener('DOMContentLoaded', async () => {
           lockedEl.style.cssText = 'font-size:.72rem;color:var(--warning);margin-top:2px;font-family:"JetBrains Mono",monospace';
           balEl.parentNode.insertBefore(lockedEl, balEl.nextSibling);
         }
-        lockedEl.textContent = '+ ' + LwsClient.formatXmr(locked) + ' XMR locked (confirming)';
+        lockedEl.textContent = '+ ' + LwsClient.formatXmr(locked) + ' ' + netCfg.ticker + ' locked (confirming)';
         lockedEl.style.display = 'block';
       } else if (lockedEl) {
         lockedEl.style.display = 'none';
@@ -948,7 +948,8 @@ document.addEventListener('DOMContentLoaded', async () => {
 
       try {
         const fee = await MoneroRPC.getFeeEstimate();
-        document.getElementById('net-fee').textContent = MoneroRPC.formatXMR(fee.feePerByte) + ' XMR/byte';
+        document.getElementById('net-fee').textContent =
+          MoneroRPC.formatXMR(fee.feePerByte, walletKeys.network) + ' ' + netCfg.ticker + '/byte';
       } catch (e) {
         document.getElementById('net-fee').textContent = 'unavailable';
       }
@@ -1099,8 +1100,12 @@ document.addEventListener('DOMContentLoaded', async () => {
       sendToHintEl.textContent = '✓ ' + label;
       sendToHintEl.style.color = '#22c55e';
     }
-    var amtNorm = amt.replace(',', '.'); // accept comma as decimal separator
-    const amtOk = amtNorm.length > 0 && /^\d+(\.\d+)?$/.test(amtNorm) && Number(amtNorm) > 0;
+    var amtNorm = amt.replace(',', '.');
+    const maxDec = (typeof Networks !== 'undefined')
+      ? Networks.getAtomicDecimals(walletKeys.network)
+      : 12;
+    const amtRe = new RegExp('^\\d+(\\.\\d{1,' + maxDec + '})?$');
+    const amtOk = amtNorm.length > 0 && amtRe.test(amtNorm) && Number(amtNorm) > 0;
     sendReviewBtn.disabled = !(v.valid && amtOk);
     // Show/hide payment ID field for primary addresses only
     const pidGroup = document.getElementById('send-pid-group');
@@ -1135,10 +1140,13 @@ document.addEventListener('DOMContentLoaded', async () => {
       sendPreview = await MoneroSend.estimateFee(walletKeys, toAddress, xmrAmount, sendPriority);
 
       document.getElementById('confirm-to').textContent = toAddress;
-      document.getElementById('confirm-amount').textContent = xmrAmount + ' XMR';
-      document.getElementById('confirm-fee').textContent = sendPreview.fee_xmr + ' XMR';
+      const ticker = (typeof Networks !== 'undefined')
+        ? Networks.get(walletKeys.network).ticker
+        : 'XMR';
+      document.getElementById('confirm-amount').textContent = xmrAmount + ' ' + ticker;
+      document.getElementById('confirm-fee').textContent = sendPreview.fee_xmr + ' ' + ticker;
       const total = (Number(xmrAmount) + Number(sendPreview.fee_xmr)).toString();
-      document.getElementById('confirm-total').textContent = total + ' XMR';
+      document.getElementById('confirm-total').textContent = total + ' ' + ticker;
 
       sendShowStep('confirm');
     } catch (e) {

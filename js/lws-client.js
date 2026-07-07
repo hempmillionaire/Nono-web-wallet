@@ -96,13 +96,9 @@ const LwsClient = (function () {
     return activeNetworkId;
   }
 
-  /** True when this network has a light-wallet backend configured (Phase 2 for NONO). */
+  /** True when a light-wallet base URL is configured (default, custom storage, or mock). */
   function isAvailable () {
     if (MOCK) return true;
-    if (typeof Networks !== 'undefined') {
-      const cfg = Networks.get(activeNetworkId);
-      if (!cfg.lwsAvailable) return false;
-    }
     return !!BASE_URL;
   }
 
@@ -475,6 +471,9 @@ const LwsClient = (function () {
    * zeros. 1 XMR = 1e12 piconero. Accepts BigInt, string, or number.
    */
   function formatXmr (atomic) {
+    if (typeof Networks !== 'undefined') {
+      return Networks.formatAtomic(atomic, activeNetworkId);
+    }
     let n;
     if (typeof atomic === 'bigint') n = atomic;
     else if (typeof atomic === 'string') n = BigInt(atomic);

@@ -43,17 +43,32 @@ const MoneroSend = (function () {
 
   // ── Amount helpers ────────────────────────────────────────────────
 
-  function xmrToAtomic (xmrStr) {
-    var s = String(xmrStr).trim().replace(',', '.'); // accept comma as decimal separator
+  function networkIdFromKeys (walletKeys) {
+    if (typeof Networks !== 'undefined' && walletKeys && walletKeys.network) {
+      return Networks.resolve(walletKeys.network);
+    }
+    return 'monero-mainnet';
+  }
+
+  function xmrToAtomic (xmrStr, networkId) {
+    var id = networkId || 'monero-mainnet';
+    if (typeof Networks !== 'undefined') {
+      return Networks.parseAtomic(xmrStr, id).toString();
+    }
+    var s = String(xmrStr).trim().replace(',', '.');
     if (!s) return '0';
-    if (!/^[0-9]+(\.[0-9]+)?$/.test(s)) throw new Error('Invalid XMR amount');
+    if (!/^[0-9]+(\.[0-9]+)?$/.test(s)) throw new Error('Invalid amount');
     var parts = s.split('.');
     var whole = parts[0] || '0';
     var frac = (parts[1] || '').padEnd(12, '0').substring(0, 12);
     return (BigInt(whole) * ATOMIC_PER_XMR + BigInt(frac)).toString();
   }
 
-  function atomicToXmr (atomic) {
+  function atomicToXmr (atomic, networkId) {
+    var id = networkId || 'monero-mainnet';
+    if (typeof Networks !== 'undefined') {
+      return Networks.formatAtomic(atomic, id);
+    }
     var n = BigInt(String(atomic || '0'));
     var whole = n / ATOMIC_PER_XMR;
     var frac = n % ATOMIC_PER_XMR;
@@ -86,9 +101,10 @@ const MoneroSend = (function () {
       feeAtomic = ((feeAtomic + feeMask - 1n) / feeMask) * feeMask;
     }
 
+    var netId = networkIdFromKeys(walletKeys);
     return {
       fee_atomic: feeAtomic.toString(),
-      fee_xmr: LwsClient.formatXmr(feeAtomic),
+      fee_xmr: atomicToXmr(feeAtomic, netId),
       per_byte: (perKbFee / 1024n).toString(),
       _unspentResp: outs,
     };
@@ -103,7 +119,7 @@ const MoneroSend = (function () {
       throw new Error('Transaction signing requires a component that could not load. Try disabling ad blockers or use a different browser.');
     }
 
-    var amountAtomic = BigInt(xmrToAtomic(xmrAmount));
+    var amountAtomic = BigInt(xmrToAtomic(xmrAmount, networkIdFromKeys(walletKeys)));
 
     // 1. Always fetch fresh unspent outputs (never use cached preview —
     // the LWS state can change between Review and Confirm steps).
@@ -187,9 +203,11 @@ const MoneroSend = (function () {
     }
 
     if (totalAvailable < amountAtomic + BigInt(estFee)) {
+      var nid = networkIdFromKeys(walletKeys);
+      var sym = (typeof Networks !== 'undefined') ? Networks.get(nid).ticker : 'XMR';
       throw new Error('Insufficient funds: need ' +
-        atomicToXmr((amountAtomic + BigInt(estFee)).toString()) +
-        ' XMR but only have ' + atomicToXmr(totalAvailable.toString()) + ' XMR');
+        atomicToXmr((amountAtomic + BigInt(estFee)).toString(), nid) +
+        ' ' + sym + ' but only have ' + atomicToXmr(totalAvailable.toString(), nid) + ' ' + sym);
     }
 
     var feeAmount = BigInt(estFee);
