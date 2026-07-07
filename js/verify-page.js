@@ -35,7 +35,7 @@ document.addEventListener('DOMContentLoaded', () => {
     25: { name:'NONO Standard (25-word)', cls:'standard', icon:'◆' },
   };
 
-  // ─── Advanced: custom Monero node URL ───
+  // ─── Advanced: custom NONO node URL ───
   // Reads and writes the same localStorage key that js/monero-rpc.js uses,
   // so whatever the user sets here on the verify page is automatically
   // picked up by the dashboard's MoneroRPC calls. Letting users configure
