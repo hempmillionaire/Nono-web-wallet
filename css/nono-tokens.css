@@ -1,0 +1,60 @@
+/* NONO design tokens — keep in sync with explorer copy (self-contained per repo). */
+:root {
+  --font-body: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace;
+
+  --bg: #08070D;
+  --surface: #11101A;
+  --surface-2: #171323;
+  --surface-elevated: #1e192e;
+
+  --nono-primary: #745BC6;
+  --nono-secondary: #5B4A8E;
+  --nono-highlight: #BFAEFF;
+  --nono-action: #745BC6;
+  --nono-action-hover: #8A72D8;
+  --nono-action-secondary-hover: #6A54B8;
+
+  --text: #FFFFFF;
+  --text-mid: #A8A8B8;
+  --text-dim: #6E6E80;
+
+  --border: rgba(191, 174, 255, 0.08);
+  --border-strong: rgba(191, 174, 255, 0.15);
+  --border-focus: rgba(191, 174, 255, 0.35);
+
+  --glow-primary: rgba(116, 91, 198, 0.40);
+  --glow-soft: rgba(191, 174, 255, 0.25);
+  --nono-action-dim: rgba(116, 91, 198, 0.15);
+
+  --success: #4a9a6a;
+  --success-dim: rgba(74, 154, 106, 0.15);
+  --warning: #d9a34f;
+  --warning-dim: rgba(217, 163, 79, 0.12);
+  --danger: #d9534f;
+  --danger-dim: rgba(217, 83, 79, 0.12);
+
+  --gradient-brand: linear-gradient(135deg, #5B4A8E 0%, #745BC6 45%, #BFAEFF 100%);
+  --gradient-bg-accent: radial-gradient(circle, rgba(116, 91, 198, 0.18) 0%, rgba(116, 91, 198, 0.06) 45%, transparent 100%);
+
+  --radius-sm: 10px;
+  --radius-md: 14px;
+  --radius-lg: 18px;
+  --shadow-glass: 0 8px 32px rgba(0, 0, 0, 0.35);
+
+  /* Legacy aliases (Monero fork class names) — action purple, not orange */
+  --xmr: var(--nono-action);
+  --xmr-dim: var(--nono-action-dim);
+  --xmr-glow: var(--glow-primary);
+}
+
+html {
+  font-family: var(--font-body);
+  background: var(--bg);
+  color: var(--text);
+}
+
+.font-mono,
+.mono {
+  font-family: var(--font-mono);
+}

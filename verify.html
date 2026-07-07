@@ -10,16 +10,17 @@
 <meta name="twitter:card" content="summary">
 <meta name="twitter:image" content="https://wallet.nonoprivacy.com/assets/nono-logo.svg">
 <title>NONO Wallet — Verify &amp; Unlock</title>
-<link rel="stylesheet" href="/css/nono-brand.css">
+<link rel="stylesheet" href="/css/nono-tokens.css?v=ds1">
+<link rel="stylesheet" href="/css/nono-components.css?v=ds1">
 <link rel="icon" type="image/svg+xml" href="/favicon.svg">
 <link rel="icon" type="image/x-icon" href="/favicon.ico" sizes="any">
 <link rel="stylesheet" href="/fonts/fonts.css">
 <style>
 :root {
-  --bg:#0a0a0a; --surface:#111113; --surface-2:#19191d; --border:rgba(255,255,255,0.06);
-  --border-focus:rgba(255,130,47,0.4); --text:#eae8e4; --text-dim:#6e6c6a; --text-mid:#9a9894;
-  --xmr:#ff6600; --xmr-dim:rgba(255,102,0,0.12); --xmr-glow:rgba(255,102,0,0.2);
-  --success:#22c55e; --danger:#ef4444; --radius-sm:10px;
+  --bg:#08070D; --surface:#11101A; --surface-2:#171323; --border:rgba(191,174,255,0.08);
+  --border-focus:rgba(191,174,255,0.35); --text:#FFFFFF; --text-dim:#6E6E80; --text-mid:#A8A8B8;
+  --xmr:#745BC6; --xmr-dim:rgba(116,91,198,0.15); --xmr-glow:rgba(116,91,198,0.40);
+  --success:#4a9a6a; --danger:#d9534f; --radius-sm:10px;
 }
 *{margin:0;padding:0;box-sizing:border-box}
 /* Stop the I-beam text caret from appearing on decorative UI when clicked.
@@ -28,7 +29,7 @@ body{user-select:none;-webkit-user-select:none;cursor:default}
 input,textarea{user-select:text;-webkit-user-select:text;cursor:text}
 .result-value,#res-mnemonic,#create-mnemonic,#create-spend,#create-view,#create-address{user-select:text;-webkit-user-select:text;cursor:text}
 button,a,.tab,.copy-btn{cursor:pointer}
-html{background:var(--bg);color:var(--text);font-family:'Outfit',sans-serif;font-size:16px;-webkit-font-smoothing:antialiased}
+html{background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;font-size:16px;-webkit-font-smoothing:antialiased}
 body{min-height:100dvh;display:flex;flex-direction:column;overflow-x:hidden}
 
 .ambient{position:fixed;inset:0;z-index:0;pointer-events:none;overflow:hidden}
@@ -83,7 +84,7 @@ nav{padding:20px 0;display:flex;align-items:center;justify-content:space-between
 .seed-format-badge.standard{background:var(--xmr-dim);border:1px solid rgba(255,102,0,0.15);color:var(--xmr)}
 
 .btn-primary{width:100%;padding:14px;background:var(--xmr);color:#fff;font-family:'Outfit',sans-serif;font-size:.9rem;font-weight:600;border:none;border-radius:var(--radius-sm);cursor:pointer;transition:all .25s;box-shadow:0 4px 24px var(--xmr-glow);display:flex;align-items:center;justify-content:center;gap:8px}
-.btn-primary:hover{background:#e85d00;transform:translateY(-1px)}
+.btn-primary:hover{background:var(--nono-action-hover,#8A72D8);transform:translateY(-1px)}
 .btn-primary:disabled{opacity:.4;cursor:not-allowed;transform:none;box-shadow:none}
 
 /* ─── RESULTS ─── */

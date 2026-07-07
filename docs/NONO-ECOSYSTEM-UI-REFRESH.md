@@ -1,6 +1,6 @@
 # NONO Ecosystem UI Refresh
 
-**Status:** Planning — UI/UX only (no logic changes)  
+**Status:** In progress (Phases 1–3) — UI/UX only (no logic changes)  
 **Reference:** [nono.social](https://nono.social)  
 **Applies to:** NONO Wallet (`wallet.nonoprivacy.com`), NONO Explorer (`explorer.nonoprivacy.com`), and related surfaces that should feel like one product.
 

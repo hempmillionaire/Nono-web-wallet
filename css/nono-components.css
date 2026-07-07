@@ -1,0 +1,142 @@
+/* NONO shared UI components (wallet; mirror in explorer repo). */
+
+.ambient .orb-1 {
+  background: var(--nono-primary) !important;
+  opacity: 0.12 !important;
+}
+.ambient .orb-2 {
+  background: var(--nono-highlight) !important;
+  opacity: 0.06 !important;
+}
+
+.logo-text span {
+  color: var(--nono-highlight);
+}
+
+.nav-links a.active,
+.nav-links a[aria-current="page"] {
+  color: var(--nono-action) !important;
+  background: var(--nono-action-dim);
+}
+
+a.nono-link {
+  color: var(--nono-action);
+  text-decoration: none;
+  transition: color 0.2s ease;
+}
+a.nono-link:hover {
+  color: var(--nono-action-hover);
+}
+
+.glass-card {
+  background: rgba(17, 16, 26, 0.72);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-glass);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+.btn-primary,
+.action-btn.primary {
+  background: var(--nono-action) !important;
+  border-color: var(--nono-action) !important;
+  color: #fff !important;
+  box-shadow: 0 4px 24px var(--glow-primary) !important;
+}
+.btn-primary:hover:not(:disabled),
+.action-btn.primary:hover {
+  background: var(--nono-action-hover) !important;
+}
+
+.tab.active {
+  box-shadow: 0 2px 12px rgba(116, 91, 198, 0.2);
+  border: 1px solid var(--border-strong);
+}
+
+.input-group textarea:focus,
+.input-group input:focus {
+  border-color: var(--border-focus) !important;
+  box-shadow: 0 0 0 3px var(--nono-action-dim) !important;
+}
+
+.loading .spinner {
+  border-top-color: var(--nono-action) !important;
+}
+
+.conn-dot.connected {
+  background: var(--success) !important;
+  box-shadow: 0 0 6px var(--success-dim) !important;
+}
+.conn-dot.connecting {
+  background: var(--warning) !important;
+}
+.conn-dot.disconnected {
+  background: var(--danger) !important;
+}
+
+.key-toggle {
+  color: var(--nono-action) !important;
+}
+
+.result-card .result-value.address {
+  color: var(--nono-highlight) !important;
+}
+
+.word-count .count {
+  color: var(--nono-action);
+}
+.word-count.valid .count {
+  color: var(--success) !important;
+}
+
+.result-match.success {
+  background: var(--success-dim) !important;
+  border-color: rgba(74, 154, 106, 0.25) !important;
+  color: var(--success) !important;
+}
+.result-match.info {
+  background: var(--nono-action-dim) !important;
+  border-color: var(--border-strong) !important;
+  color: var(--nono-highlight) !important;
+}
+
+.error-msg {
+  background: var(--danger-dim) !important;
+  border-color: rgba(217, 83, 79, 0.25) !important;
+  color: var(--danger) !important;
+}
+
+.disconnect-btn {
+  border-color: rgba(217, 83, 79, 0.35) !important;
+  color: var(--danger) !important;
+}
+
+.balance-value .xmr-symbol {
+  color: var(--nono-highlight) !important;
+}
+
+#network-badge {
+  color: var(--nono-highlight) !important;
+  border-color: var(--border-strong) !important;
+}
+
+.send-prio-btn.active {
+  background: var(--nono-action-dim) !important;
+  border-color: var(--border-strong) !important;
+  color: var(--nono-highlight) !important;
+}
+
+.wallet-address .copy-toast {
+  background: var(--nono-action) !important;
+}
+
+#scan-bar-fill {
+  background: var(--nono-action) !important;
+}
+
+.seed-format-badge.standard {
+  background: var(--nono-action-dim) !important;
+  border-color: var(--border-strong) !important;
+  color: var(--nono-highlight) !important;
+}

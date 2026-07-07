@@ -3,27 +3,26 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1">
-<meta property="og:title" content="Wallet dashboard — monero-web.com">
-<meta property="og:description" content="Your non-custodial Monero wallet, running entirely in your browser. View your address, generate subaddresses, receive XMR.">
-<meta property="og:url" content="https://monero-web.com/dashboard">
+<meta property="og:title" content="NONO Wallet — Dashboard">
+<meta property="og:description" content="Your non-custodial NONO wallet in the browser. Balance, send, receive, and transaction history.">
+<meta property="og:url" content="https://wallet.nonoprivacy.com/dashboard.html">
 <meta property="og:type" content="website">
-<meta property="og:image" content="https://monero-web.com/assets/social-card.png">
+<meta property="og:image" content="https://wallet.nonoprivacy.com/assets/nono-logo.png">
 <link rel="preload" href="js/mymonero-core/MyMoneroCoreCpp_WASM.wasm" as="fetch" crossorigin>
-<meta property="og:image:width" content="1200">
-<meta property="og:image:height" content="630">
-<meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:image" content="https://monero-web.com/assets/social-card.png">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="https://wallet.nonoprivacy.com/assets/nono-logo.png">
 <title>NONO Wallet — Dashboard</title>
-<link rel="stylesheet" href="/css/nono-brand.css">
+<link rel="stylesheet" href="/css/nono-tokens.css?v=ds1">
+<link rel="stylesheet" href="/css/nono-components.css?v=ds1">
 <link rel="icon" type="image/svg+xml" href="/favicon.svg">
 <link rel="icon" type="image/x-icon" href="/favicon.ico" sizes="any">
 <link rel="stylesheet" href="/fonts/fonts.css">
 <style>
 :root {
-  --bg:#0a0a0a; --surface:#111113; --surface-2:#19191d; --border:rgba(255,255,255,0.06);
-  --border-focus:rgba(255,130,47,0.4); --text:#eae8e4; --text-dim:#6e6c6a; --text-mid:#9a9894;
-  --xmr:#ff6600; --xmr-dim:rgba(255,102,0,0.12); --xmr-glow:rgba(255,102,0,0.2);
-  --success:#22c55e; --danger:#ef4444; --warning:#f59e0b; --radius-sm:10px;
+  --bg:#08070D; --surface:#11101A; --surface-2:#171323; --border:rgba(191,174,255,0.08);
+  --border-focus:rgba(191,174,255,0.35); --text:#FFFFFF; --text-dim:#6E6E80; --text-mid:#A8A8B8;
+  --xmr:#745BC6; --xmr-dim:rgba(116,91,198,0.15); --xmr-glow:rgba(116,91,198,0.40);
+  --success:#4a9a6a; --danger:#d9534f; --warning:#d9a34f; --radius-sm:10px;
 }
 *{margin:0;padding:0;box-sizing:border-box}
 /* Stop the I-beam text caret from appearing on decorative UI when clicked.
@@ -32,7 +31,7 @@ body{user-select:none;-webkit-user-select:none;cursor:default}
 input,textarea{user-select:text;-webkit-user-select:text;cursor:text}
 .wallet-address,.receive-address,.key-value,#sub-list,#sub-list *{user-select:text;-webkit-user-select:text;cursor:text}
 button,a,.action-btn,.tab,.key-toggle,.copy-btn,.modal-close,.disconnect-btn{cursor:pointer}
-html{background:var(--bg);color:var(--text);font-family:'Outfit',sans-serif;font-size:16px;-webkit-font-smoothing:antialiased}
+html{background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;font-size:16px;-webkit-font-smoothing:antialiased}
 body{min-height:100dvh;display:flex;flex-direction:column;overflow-x:hidden}
 .page{position:relative;z-index:2;flex:1;display:flex;flex-direction:column}
 .container{width:100%;max-width:500px;margin:0 auto;padding:0 20px}
@@ -75,7 +74,7 @@ nav{padding:16px 0;display:flex;align-items:center;justify-content:space-between
 .action-btn{flex:1;padding:14px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text);font-family:'Outfit',sans-serif;font-size:.85rem;font-weight:500;cursor:pointer;transition:all .25s;display:flex;align-items:center;justify-content:center;gap:8px}
 .action-btn:hover{background:var(--surface-2);border-color:rgba(255,255,255,0.12)}
 .action-btn.primary{background:var(--xmr);border-color:var(--xmr);color:#fff;box-shadow:0 4px 16px var(--xmr-glow)}
-.action-btn.primary:hover{background:#e85d00}
+.action-btn.primary:hover{background:var(--nono-action-hover,#8A72D8)}
 .action-btn svg{width:18px;height:18px}
 
 /* Info cards */
