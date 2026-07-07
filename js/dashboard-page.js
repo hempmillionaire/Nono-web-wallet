@@ -115,15 +115,21 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // ─── Dashboard initialiser ──────────────────────────────────────────
   async function initDashboard() {
-    // Stay on loading UI until connectAndPopulate() succeeds — do not show
-    // #dashboard early or the conn bar sticks on the static HTML placeholder.
     if (typeof LwsClient !== 'undefined' && LwsClient.prewarm && LwsClient.isAvailable()) {
       LwsClient.prewarm();
     }
     if (typeof MoneroCore !== 'undefined') {
       MoneroCore.load().catch(function () {});
     }
-    await populateWallet();
+    try {
+      await populateWallet();
+    } catch (e) {
+      console.error('[dashboard] populateWallet failed:', e);
+      document.getElementById('loading-state').style.display = 'none';
+      document.getElementById('dashboard').style.display = 'block';
+      const note = document.getElementById('balance-note');
+      if (note) note.textContent = 'Dashboard error: ' + (e.message || String(e));
+    }
     installIdleListeners();
   }
 
@@ -139,6 +145,10 @@ document.addEventListener('DOMContentLoaded', async () => {
   const balanceTicker = document.getElementById('balance-ticker');
   if (networkBadge) networkBadge.textContent = netCfg.displayName + ' · ' + netCfg.ticker;
   if (balanceTicker) balanceTicker.textContent = netCfg.ticker;
+
+  // Show wallet chrome immediately — RPC/LWS connect in the background (conn bar).
+  document.getElementById('loading-state').style.display = 'none';
+  document.getElementById('dashboard').style.display = 'block';
 
   const connDot = document.getElementById('conn-dot');
   const connInfo = document.getElementById('conn-info');
@@ -190,8 +200,6 @@ document.addEventListener('DOMContentLoaded', async () => {
   refreshPrimaryAddressDisplay();
 
   // ─── Populate wallet info ───
-  document.getElementById('wallet-address').insertAdjacentText('afterbegin', walletKeys.address);
-  document.getElementById('receive-addr').textContent = walletKeys.address;
   document.getElementById('key-spend').textContent = walletKeys.privateSpendKeyHex || '— not available (watch-only) —';
   document.getElementById('key-view').textContent = walletKeys.privateViewKeyHex;
   document.getElementById('key-pub-spend').textContent = walletKeys.publicSpendKeyHex || '— not available (watch-only) —';
@@ -895,14 +903,9 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Wraps the network connect + populate flow so it can be called both on
   // initial load and from any in-page retry button without reloading.
   async function connectAndPopulate () {
-    document.getElementById('loading-state').style.display = 'block';
-    document.getElementById('loading-state').innerHTML =
-      '<div class="spinner"></div><p>Connecting to NONO network…</p>';
+    updateConnBar({ status: 'connecting', message: 'Connecting to NONO network…' });
     try {
       const node = await MoneroRPC.connect();
-
-      document.getElementById('loading-state').style.display = 'none';
-      document.getElementById('dashboard').style.display = 'block';
 
       document.getElementById('net-node').textContent     = node.name;
       document.getElementById('net-height').textContent   = node.height ? node.height.toLocaleString() : '—';
@@ -923,31 +926,15 @@ document.addEventListener('DOMContentLoaded', async () => {
         document.getElementById('net-fee').textContent = 'unavailable';
       }
 
-      // Kick off the light-wallet scan via monero-lws. The actual UI updates
-      // are driven by startBalancePolling() below — this just registers the
-      // wallet on first load. If the LWS is unreachable (still building, sync
-      // not done, etc.) the UI shows an explanatory message and falls back
-      // to "balance unknown — scanning unavailable" rather than breaking the
-      // dashboard.
       startBalancePolling();
     } catch (e) {
-      // Build a structured error block with two recovery options.
+      updateConnBar({ status: 'disconnected', message: 'Could not reach NONO RPC: ' + (e.message || 'unknown') });
+      const noteEl = document.getElementById('balance-note');
+      if (noteEl) {
+        noteEl.textContent = 'Node unreachable — address and keys still work. Use conn bar retry when RPC is back.';
+      }
       const ls = document.getElementById('loading-state');
-      ls.style.display = 'block';
-      ls.innerHTML =
-        '<div style="text-align:center;max-width:380px;margin:0 auto">' +
-          '<svg width="40" height="40" fill="none" stroke="#f87171" stroke-width="1.5" viewBox="0 0 24 24" style="margin:0 auto 14px"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>' +
-          '<p style="color:#f87171;font-size:.92rem;font-weight:600;margin-bottom:6px">Could not reach NONO node</p>' +
-          '<p style="color:var(--text-dim);font-size:.78rem;line-height:1.55;margin-bottom:4px">' + escapeHtml(e.message) + '</p>' +
-          '<p style="color:var(--text-dim);font-size:.72rem;line-height:1.55;margin-bottom:18px">This usually means the proxy is rate-limited, the upstream nodes are temporarily down, or your network is blocking the request. Your wallet keys are unaffected.</p>' +
-          '<button id="err-retry" class="action-btn" style="padding:10px 22px;font-size:.82rem;width:auto;display:inline-flex;margin-right:8px">Retry</button>' +
-          '<button id="err-disconnect" class="action-btn" style="padding:10px 22px;font-size:.82rem;width:auto;display:inline-flex;background:transparent">Disconnect</button>' +
-        '</div>';
-      document.getElementById('err-retry').addEventListener('click', () => connectAndPopulate());
-      document.getElementById('err-disconnect').addEventListener('click', () => {
-        WalletVault.clear();
-        window.location.href = '/';
-      });
+      ls.style.display = 'none';
     }
   }
 
