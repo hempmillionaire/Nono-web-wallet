@@ -1,0 +1,10 @@
+/* NONO brand — shared with explorer (black + #73AD21 accent) */
+:root {
+  --xmr: #73AD21;
+  --xmr-dim: rgba(115, 173, 33, 0.14);
+  --xmr-glow: rgba(115, 173, 33, 0.28);
+  --border-focus: rgba(115, 173, 33, 0.45);
+}
+.ambient .orb-1 { background: #73AD21 !important; }
+.ambient .orb-2 { background: #8fdc3c !important; }
+.logo-text span { color: var(--xmr); }
