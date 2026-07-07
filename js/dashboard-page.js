@@ -136,16 +136,14 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   const isWatchOnly = !!walletKeys.watchOnly;
 
-  // ─── Active network (Monero vs NONO) ───
+  // ─── NONO network (single chain) ───
   walletKeys.network = Networks.resolve(walletKeys.network || Networks.getActiveId());
   Networks.setActiveId(walletKeys.network);
   let netCfg = Networks.get(walletKeys.network);
   const networkBadge = document.getElementById('network-badge');
   const balanceTicker = document.getElementById('balance-ticker');
-  const dashNetSelect = document.getElementById('dashboard-network-select');
   if (networkBadge) networkBadge.textContent = netCfg.displayName + ' · ' + netCfg.ticker;
   if (balanceTicker) balanceTicker.textContent = netCfg.ticker;
-  if (dashNetSelect) dashNetSelect.value = netCfg.id;
 
   function updateLwsUnavailableBanner () {
     const banner = document.getElementById('lws-unavailable-banner');
@@ -154,7 +152,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       banner.style.display = 'block';
       banner.textContent =
         'Balance and transaction history require a light-wallet server for ' + netCfg.displayName +
-        '. LWS is not configured for this network yet (NONO is Phase 2). Address, receive, and keys still work.';
+        '. LWS is not configured yet. Address, receive, and keys still work.';
     } else {
       banner.style.display = 'none';
       banner.textContent = '';
@@ -171,41 +169,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     document.getElementById('receive-addr').textContent = walletKeys.address;
   }
 
-  if (dashNetSelect && !dashNetSelect.dataset.bound) {
-    dashNetSelect.dataset.bound = '1';
-    dashNetSelect.addEventListener('change', async function () {
-      const newId = Networks.resolve(dashNetSelect.value);
-      if (newId === Networks.resolve(walletKeys.network)) return;
-      if (isWatchOnly) {
-        alert('Watch-only: import each chain\'s address on Verify — cannot re-derive from spend key.');
-        dashNetSelect.value = Networks.resolve(walletKeys.network);
-        return;
-      }
-      if (!walletKeys.privateSpendKeyHex) {
-        alert('Spend key required to switch networks.');
-        dashNetSelect.value = Networks.resolve(walletKeys.network);
-        return;
-      }
-      const updated = MoneroKeys.deriveFromSpendKey(walletKeys.privateSpendKeyHex, newId);
-      walletKeys = Object.assign({}, walletKeys, updated);
-      WalletVault.store(walletKeys);
-      Networks.setActiveId(newId);
-      netCfg = Networks.get(walletKeys.network);
-      if (networkBadge) networkBadge.textContent = netCfg.displayName + ' · ' + netCfg.ticker;
-      if (balanceTicker) balanceTicker.textContent = netCfg.ticker;
-      lwsRegistered = false;
-      if (balancePollTimer) { clearInterval(balancePollTimer); balancePollTimer = null; }
-      refreshPrimaryAddressDisplay();
-      updateLwsUnavailableBanner();
-      renderSubBook();
-      try {
-        await MoneroRPC.connect();
-        startBalancePolling();
-      } catch (e) {
-        console.warn('[network] RPC reconnect failed:', e.message);
-      }
-    });
-  }
+  refreshPrimaryAddressDisplay();
 
   // ─── Populate wallet info ───
   document.getElementById('wallet-address').insertAdjacentText('afterbegin', walletKeys.address);
@@ -836,7 +800,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       }
 
       if (txs.length === 0) {
-        listEl.innerHTML = '<div class="key-card" style="text-align:center;color:var(--text-dim);font-size:.75rem;padding:18px">No transactions yet. Receive some XMR and it\'ll show up here.</div>';
+        listEl.innerHTML = '<div class="key-card" style="text-align:center;color:var(--text-dim);font-size:.75rem;padding:18px">No transactions yet. Receive some ' + netCfg.ticker + ' and it\'ll show up here.</div>';
         return;
       }
 
@@ -873,8 +837,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         detailRows += '<tr><td style="color:var(--text-dim);padding:4px 12px 4px 0;white-space:nowrap">Transaction ID</td><td style="padding:4px 0;word-break:break-all"><span class="tx-detail-copy" data-copy="' + escapeHtml(fullHash) + '" style="cursor:pointer" title="Click to copy">' + escapeHtml(fullHash) + '</span></td></tr>';
         detailRows += '<tr><td style="color:var(--text-dim);padding:4px 12px 4px 0">Date</td><td style="padding:4px 0">' + escapeHtml(when) + '</td></tr>';
         detailRows += '<tr><td style="color:var(--text-dim);padding:4px 12px 4px 0">Height</td><td style="padding:4px 0">' + (tx.height ? tx.height.toLocaleString() : 'mempool') + '</td></tr>';
-        detailRows += '<tr><td style="color:var(--text-dim);padding:4px 12px 4px 0">Amount</td><td style="padding:4px 0;font-weight:600;color:' + arrowCol + '">' + (isIn ? '+' : '−') + display + ' XMR</td></tr>';
-        detailRows += '<tr><td style="color:var(--text-dim);padding:4px 12px 4px 0">Fee</td><td style="padding:4px 0">' + feeDisplay + (feeDisplay !== '—' ? ' XMR' : '') + '</td></tr>';
+        detailRows += '<tr><td style="color:var(--text-dim);padding:4px 12px 4px 0">Amount</td><td style="padding:4px 0;font-weight:600;color:' + arrowCol + '">' + (isIn ? '+' : '−') + display + ' ' + netCfg.ticker + '</td></tr>';
+        detailRows += '<tr><td style="color:var(--text-dim);padding:4px 12px 4px 0">Fee</td><td style="padding:4px 0">' + feeDisplay + (feeDisplay !== '—' ? ' ' + netCfg.ticker : '') + '</td></tr>';
         detailRows += '<tr><td style="color:var(--text-dim);padding:4px 12px 4px 0">Confirmations</td><td style="padding:4px 0">' + (tx.mempool ? 'unconfirmed' : confirms.toLocaleString()) + '</td></tr>';
         if (paymentId) {
           detailRows += '<tr><td style="color:var(--text-dim);padding:4px 12px 4px 0">Payment ID</td><td style="padding:4px 0;word-break:break-all">' + escapeHtml(paymentId) + '</td></tr>';
@@ -887,7 +851,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             '<div style="display:flex;align-items:center;gap:10px;min-width:0;flex:1">' +
               '<span style="font-size:1.1rem;color:' + arrowCol + ';font-weight:700;flex-shrink:0">' + arrow + '</span>' +
               '<div style="min-width:0">' +
-                '<div style="font-size:.82rem;font-weight:600;color:var(--text);font-family:\'JetBrains Mono\',monospace">' + (isIn ? '+' : '−') + display + ' <span style="color:var(--text-dim);font-size:.7rem;font-weight:400">XMR</span></div>' +
+                '<div style="font-size:.82rem;font-weight:600;color:var(--text);font-family:\'JetBrains Mono\',monospace">' + (isIn ? '+' : '−') + display + ' <span style="color:var(--text-dim);font-size:.7rem;font-weight:400">' + netCfg.ticker + '</span></div>' +
                 '<div style="font-size:.65rem;color:var(--text-dim);margin-top:2px">' + escapeHtml(when) + ' · ' + status + '</div>' +
               '</div>' +
             '</div>' +
@@ -934,7 +898,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   async function connectAndPopulate () {
     document.getElementById('loading-state').style.display = 'block';
     document.getElementById('loading-state').innerHTML =
-      '<div class="spinner"></div><p>Connecting to Monero network…</p>';
+      '<div class="spinner"></div><p>Connecting to NONO network…</p>';
     try {
       const node = await MoneroRPC.connect();
 
@@ -968,7 +932,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       ls.innerHTML =
         '<div style="text-align:center;max-width:380px;margin:0 auto">' +
           '<svg width="40" height="40" fill="none" stroke="#f87171" stroke-width="1.5" viewBox="0 0 24 24" style="margin:0 auto 14px"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>' +
-          '<p style="color:#f87171;font-size:.92rem;font-weight:600;margin-bottom:6px">Could not reach a Monero node</p>' +
+          '<p style="color:#f87171;font-size:.92rem;font-weight:600;margin-bottom:6px">Could not reach NONO node</p>' +
           '<p style="color:var(--text-dim);font-size:.78rem;line-height:1.55;margin-bottom:4px">' + escapeHtml(e.message) + '</p>' +
           '<p style="color:var(--text-dim);font-size:.72rem;line-height:1.55;margin-bottom:18px">This usually means the proxy is rate-limited, the upstream nodes are temporarily down, or your network is blocking the request. Your wallet keys are unaffected.</p>' +
           '<button id="err-retry" class="action-btn" style="padding:10px 22px;font-size:.82rem;width:auto;display:inline-flex;margin-right:8px">Retry</button>' +
@@ -1142,7 +1106,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       document.getElementById('confirm-to').textContent = toAddress;
       const ticker = (typeof Networks !== 'undefined')
         ? Networks.get(walletKeys.network).ticker
-        : 'XMR';
+        : 'NONO';
       document.getElementById('confirm-amount').textContent = xmrAmount + ' ' + ticker;
       document.getElementById('confirm-fee').textContent = sendPreview.fee_xmr + ' ' + ticker;
       const total = (Number(xmrAmount) + Number(sendPreview.fee_xmr)).toString();

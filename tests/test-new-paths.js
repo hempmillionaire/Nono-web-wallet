@@ -86,11 +86,11 @@ function assertEq(actual, expected, msg) {
   });
 
   // BIP-39
-  await test('BIP-39 12 words → produces a valid mainnet address', async () => {
+  await test('BIP-39 12 words → produces a valid NONO address', async () => {
     const m = 'abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about';
-    const k = await MoneroKeys.deriveFromBip39(m, '', 'mainnet');
-    assertEq(k.address.length, 95, 'mainnet length');
-    assertEq(k.address[0],     '4', 'mainnet prefix');
+    const k = await MoneroKeys.deriveFromBip39(m, '', 'nono-mainnet');
+    assertEq(k.address.length, 95, 'address length');
+    assertEq(k.address[0],     'N', 'NONO prefix');
     assertEq(k.privateSpendKeyHex.length, 64);
     assertEq(k.privateViewKeyHex.length,  64);
     // Determinism: re-derive
@@ -132,24 +132,24 @@ function assertEq(actual, expected, msg) {
     assert(threw, 'bad checksum should throw');
   });
 
-  await test('Polyseed → full Monero address derivation', async () => {
+  await test('Polyseed → full NONO address derivation', async () => {
     const ps = 'raven tail swear infant grief assist regular lamp duck valid someone little harsh puppy airport language';
-    const k  = await MoneroKeys.deriveFromPolyseed(ps, 'mainnet');
+    const k  = await MoneroKeys.deriveFromPolyseed(ps, 'nono-mainnet');
     assertEq(k.address.length, 95);
-    assertEq(k.address[0],     '4');
+    assertEq(k.address[0],     'N');
     assertEq(k.seedFormat,     'polyseed');
     assertEq(k.wordCount,      16);
   });
 
   // Subaddresses
-  await test('Subaddress (0,1) starts with 8 and differs from primary', () => {
-    const w = MoneroKeys.generateWallet('english', 'mainnet');
+  await test('Subaddress (0,1) differs from primary (NONO)', () => {
+    const w = MoneroKeys.generateWallet('english', 'nono-mainnet');
     const sub = MoneroSubaddress.generate({
       privateViewKey: MoneroKeys.hexToBytes(w.privateViewKeyHex),
       publicSpendKey: MoneroKeys.hexToBytes(w.publicSpendKeyHex),
-    }, 0, 1);
+    }, 0, 1, 'nono-mainnet');
     assertEq(sub.address.length, 95);
-    assertEq(sub.address[0],     '8', 'subaddress netbyte');
+    assertEq(sub.address[0],     'N', 'NONO subaddress prefix');
     assert(sub.address !== w.address, 'subaddress != primary');
   });
 
@@ -201,17 +201,7 @@ function assertEq(actual, expected, msg) {
     });
   }
 
-  // Network selection
-  await test('Stagenet derivation produces a 5… address', () => {
-    const w = MoneroKeys.generateWallet('english', 'stagenet');
-    assertEq(w.address[0], '5');
-  });
-  await test('Testnet derivation produces a 9… or A… address', () => {
-    const w = MoneroKeys.generateWallet('english', 'testnet');
-    assert(w.address[0] === '9' || w.address[0] === 'A',
-      'testnet prefix was: ' + w.address[0]);
-  });
-
+  // Network selection — NONO only
   await test('NONO mainnet address starts with N (prefix 127)', () => {
     const w = MoneroKeys.generateWallet('english', 'nono-mainnet');
     assertEq(w.network, 'nono-mainnet');
@@ -219,26 +209,16 @@ function assertEq(actual, expected, msg) {
     assertEq(w.address.length, 95);
   });
 
-  await test('Same seed → different Monero vs NONO addresses', () => {
-    const seed = new Uint8Array(32);
-    seed[31] = 42;
-    const m = MoneroKeys.deriveFromSeed(seed, 'monero-mainnet');
-    const n = MoneroKeys.deriveFromSeed(seed, 'nono-mainnet');
-    assert(m.address !== n.address, 'addresses must differ');
-    assertEq(m.privateSpendKeyHex, n.privateSpendKeyHex, 'same spend key');
-    assertEq(m.address[0], '4');
-    assertEq(n.address[0], 'N');
+  await test('Default wallet generation uses NONO mainnet', () => {
+    const w = MoneroKeys.generateWallet('english');
+    assertEq(w.network, 'nono-mainnet');
+    assertEq(w.address[0], 'N');
   });
 
   await test('NONO formatAtomic uses 10 decimals', () => {
     assertEq(Networks.formatAtomic(10000000000n, 'nono-mainnet'), '1');
     assertEq(Networks.formatAtomic(15000000000n, 'nono-mainnet'), '1.5');
     assertEq(Networks.parseAtomic('1.5', 'nono-mainnet'), 15000000000n);
-  });
-
-  await test('Monero formatAtomic uses 12 decimals', () => {
-    assertEq(Networks.formatAtomic(1000000000000n, 'monero-mainnet'), '1');
-    assertEq(Networks.parseAtomic('0.000001', 'monero-mainnet'), 1000000n);
   });
 
   // WalletVault
@@ -307,11 +287,12 @@ function assertEq(actual, expected, msg) {
   });
 
   // ── LwsClient (mock-mode behaviour) ────────────────────────────────
-  await test('LwsClient.formatXmr — atomic units → human XMR', () => {
-    assertEq(LwsClient.formatXmr('1000000000000'), '1');
-    assertEq(LwsClient.formatXmr('1234567890000'), '1.23456789');
+  await test('LwsClient.formatXmr — atomic units → human NONO (10 decimals)', () => {
+    LwsClient.setActiveNetwork('nono-mainnet');
+    assertEq(LwsClient.formatXmr('10000000000'), '1');
+    assertEq(LwsClient.formatXmr('12345678900'), '1.23456789');
     assertEq(LwsClient.formatXmr('0'), '0');
-    assertEq(LwsClient.formatXmr('1'), '0.000000000001');
+    assertEq(LwsClient.formatXmr('1'), '0.0000000001');
   });
 
   await test('LwsClient.availableBalance — total - sent - locked', () => {

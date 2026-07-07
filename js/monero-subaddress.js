@@ -66,7 +66,7 @@ const MoneroSubaddress = (function () {
    */
   function encodeSubaddress(pubSpend, pubView, networkIdOrLegacy) {
     const raw = new Uint8Array(69);
-    raw[0] = subaddressNetByte(networkIdOrLegacy || 'monero-mainnet');
+    raw[0] = subaddressNetByte(networkIdOrLegacy || 'nono-mainnet');
     raw.set(pubSpend, 1);
     raw.set(pubView, 33);
     const hash = Keccak256.hash(raw.slice(0, 65));

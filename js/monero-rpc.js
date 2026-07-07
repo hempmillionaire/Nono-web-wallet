@@ -28,8 +28,8 @@ const MoneroRPC = (function () {
   // Picked per active network from js/networks.js (see setActiveNetwork).
   let PROXY_URL = '/api/proxy';
   // Per-network localStorage key for optional user-supplied direct node URL.
-  let CUSTOM_NODE_KEY = 'monero-web-node-url:monero-mainnet';
-  let activeNetworkId = 'monero-mainnet';
+  let CUSTOM_NODE_KEY = 'nono-web-node-url';
+  let activeNetworkId = 'nono-mainnet';
 
   let pinnedRpcBase = '';
 
@@ -37,23 +37,10 @@ const MoneroRPC = (function () {
     if (typeof Networks === 'undefined') return;
     const cfg = Networks.get(networkIdOrLegacy);
     activeNetworkId = cfg.id;
-    if (cfg.id === 'monero-mainnet' && typeof location !== 'undefined' &&
-        /\.netlify\.(app|com)$/i.test(location.hostname)) {
-      PROXY_URL = '/.netlify/functions/node-proxy';
-    } else {
-      PROXY_URL = cfg.rpcProxyPath || '/api/proxy';
-    }
-    CUSTOM_NODE_KEY = cfg.customNodeStorageKey || 'monero-web-node-url';
+    PROXY_URL = cfg.rpcProxyPath || '/api/rpc-nono';
+    CUSTOM_NODE_KEY = cfg.customNodeStorageKey || 'nono-web-node-url';
     pinnedRpcBase = '';
     currentNode = null;
-    if (cfg.id === 'monero-mainnet') {
-      try {
-        const legacy = localStorage.getItem('monero-web-node-url');
-        if (legacy && !localStorage.getItem(CUSTOM_NODE_KEY)) {
-          localStorage.setItem(CUSTOM_NODE_KEY, legacy);
-        }
-      } catch (e) {}
-    }
   }
 
   function getActiveNetworkId() {

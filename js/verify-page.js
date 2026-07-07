@@ -46,8 +46,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const networkSelect = document.getElementById('network-select');
 
   function getSelectedNetworkId () {
-    if (networkSelect && networkSelect.value) return networkSelect.value;
-    return Networks.getActiveId();
+    return Networks.NETWORK_ID || 'nono-mainnet';
   }
 
   function getNodeStorageKey () {
@@ -88,7 +87,7 @@ document.addEventListener('DOMContentLoaded', () => {
       try {
         if (v) localStorage.setItem(getNodeStorageKey(), v.replace(/\/$/, ''));
         else   localStorage.removeItem(getNodeStorageKey());
-        advMsg.textContent = v ? 'Saved. Your wallet will use this node.' : 'Cleared. Using monero-web proxy.';
+        advMsg.textContent = v ? 'Saved. Your wallet will use this node.' : 'Cleared. Using default NONO RPC.';
         advMsg.style.color = v ? 'var(--success)' : 'var(--text-dim)';
       } catch (e) {
         advMsg.textContent = 'Could not save: ' + e.message;
@@ -98,7 +97,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (advReset) advReset.addEventListener('click', () => {
       try { localStorage.removeItem(getNodeStorageKey()); } catch (e) {}
       advInput.value = '';
-      advMsg.textContent = 'Reverted to monero-web proxy (default).';
+      advMsg.textContent = 'Reverted to default NONO RPC.';
       advMsg.style.color = 'var(--text-dim)';
     });
   }
@@ -168,21 +167,7 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function ageToHeight(age) {
-    // Monero checkpoint estimator — not valid for NONO; use manual restore height there.
-    if (getSelectedNetworkId() === 'nono-mainnet') {
-      return age === 'unknown' ? 0 : 0;
-    }
-    var tip = estimatedCurrentHeight();
-    switch (age) {
-      case 'week':    return Math.max(0, tip - 7 * BLOCKS_PER_DAY);
-      case 'month':   return Math.max(0, tip - 30 * BLOCKS_PER_DAY);
-      case '3months': return Math.max(0, tip - 91 * BLOCKS_PER_DAY);
-      case '6months': return Math.max(0, tip - 182 * BLOCKS_PER_DAY);
-      case 'year':    return Math.max(0, tip - 365 * BLOCKS_PER_DAY);
-      case '2years':  return Math.max(0, tip - 730 * BLOCKS_PER_DAY);
-      case 'unknown': return 0;
-      default:        return 0;
-    }
+    return age === 'unknown' ? 0 : 0;
   }
 
   var restoreHeightEl = $el('restore-height');
@@ -537,7 +522,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 privateViewKey: wallet.privateViewKeyHex,
                 publicSpendKey: wallet.publicSpendKeyHex,
                 publicViewKey: wallet.publicViewKeyHex,
-                network: wallet.network || 'mainnet',
+                network: Networks.resolve(wallet.network || 'nono-mainnet'),
                 createdAt: new Date().toISOString(),
               };
               var blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });

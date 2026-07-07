@@ -17,7 +17,7 @@ const MoneroKeys = (function () {
   'use strict';
 
   /**
-   * Address net byte from js/networks.js (supports monero-mainnet, nono-mainnet, legacy nettypes).
+   * Address net byte from js/networks.js (NONO mainnet).
    */
   function netByteForNetwork(networkIdOrLegacy) {
     if (typeof Networks === 'undefined') {
@@ -36,8 +36,8 @@ const MoneroKeys = (function () {
    */
   function deriveFromSeed(seedBytes, networkIdOrLegacy) {
     const networkId = (typeof Networks !== 'undefined')
-      ? Networks.resolve(networkIdOrLegacy || 'monero-mainnet')
-      : (networkIdOrLegacy || 'mainnet');
+      ? Networks.resolve(networkIdOrLegacy || 'nono-mainnet')
+      : 'nono-mainnet';
     if (seedBytes.length !== 32) {
       throw new Error(`Seed must be 32 bytes, got ${seedBytes.length}`);
     }
@@ -222,12 +222,12 @@ const MoneroKeys = (function () {
    * Uses browser crypto.getRandomValues() for secure entropy
    *
    * @param {string} lang - Word list language (default: 'english')
-   * @param {string} network - 'mainnet'|'testnet'|'stagenet'
+   * @param {string} network - network id (default: nono-mainnet)
    * @returns {Object} - Full wallet with mnemonic seed phrase
    */
   function generateWallet(lang, network) {
     lang = lang || 'english';
-    network = network || 'mainnet';
+    network = network || 'nono-mainnet';
 
     // Generate 32 random bytes
     const seedBytes = new Uint8Array(32);

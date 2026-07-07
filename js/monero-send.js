@@ -47,11 +47,11 @@ const MoneroSend = (function () {
     if (typeof Networks !== 'undefined' && walletKeys && walletKeys.network) {
       return Networks.resolve(walletKeys.network);
     }
-    return 'monero-mainnet';
+    return 'nono-mainnet';
   }
 
   function xmrToAtomic (xmrStr, networkId) {
-    var id = networkId || 'monero-mainnet';
+    var id = networkId || 'nono-mainnet';
     if (typeof Networks !== 'undefined') {
       return Networks.parseAtomic(xmrStr, id).toString();
     }
@@ -65,7 +65,7 @@ const MoneroSend = (function () {
   }
 
   function atomicToXmr (atomic, networkId) {
-    var id = networkId || 'monero-mainnet';
+    var id = networkId || 'nono-mainnet';
     if (typeof Networks !== 'undefined') {
       return Networks.formatAtomic(atomic, id);
     }

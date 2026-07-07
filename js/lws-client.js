@@ -72,7 +72,7 @@ const LwsClient = (function () {
   function isMock () { return MOCK; }
 
   // Active chain/network — configured via js/networks.js
-  let activeNetworkId = 'monero-mainnet';
+  let activeNetworkId = 'nono-mainnet';
 
   function setActiveNetwork (networkIdOrLegacy) {
     if (typeof Networks === 'undefined') return;
