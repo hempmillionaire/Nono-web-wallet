@@ -1,6 +1,19 @@
 // SPDX-License-Identifier: MIT
-// verify-page.js — moved inline so the CSP can drop 'unsafe-inline' for scripts
-document.addEventListener('DOMContentLoaded', () => {
+// verify-page.js — NONO wallet verify UI
+(function () {
+  'use strict';
+
+  function showBootError (err) {
+    console.error('[verify]', err);
+    var el = document.getElementById('error-msg');
+    if (el) {
+      el.textContent = 'Wallet UI failed to start: ' + (err && err.message ? err.message : String(err));
+      el.classList.add('show');
+    }
+  }
+
+  function boot () {
+  try {
   // Defensive helpers — return safe defaults if a referenced element is
   // missing. Stops "cannot read property 'value' of null" errors when a
   // user is running a stale cached version of this script against a
@@ -17,7 +30,9 @@ document.addEventListener('DOMContentLoaded', () => {
   // re-enter their seed. They can still derive a different wallet from this
   // page if they want.
   (function showActiveSessionBanner () {
-    if (!WalletVault.hasBlob()) return;
+    try {
+      if (typeof WalletVault === 'undefined' || !WalletVault.hasBlob()) return;
+    } catch (e) { return; }
     const banner = document.createElement('div');
     banner.style.cssText = 'background:rgba(34,197,94,0.08);border:1px solid rgba(34,197,94,0.25);border-radius:10px;padding:14px 16px;margin-bottom:18px;display:flex;align-items:center;gap:12px;flex-wrap:wrap';
     banner.innerHTML =
@@ -44,20 +59,34 @@ document.addEventListener('DOMContentLoaded', () => {
   const NODE_KEY = 'monero-web-node-url'; // legacy; per-network keys live in Networks registry
 
   const networkSelect = document.getElementById('network-select');
+  const advInput = $el('adv-node-url');
+  const advMsg   = $el('adv-node-msg');
+  const advSave  = $el('adv-node-save');
+  const advReset = $el('adv-node-reset');
 
   function getSelectedNetworkId () {
-    return Networks.NETWORK_ID || 'nono-mainnet';
+    if (typeof Networks !== 'undefined' && Networks.NETWORK_ID) {
+      return Networks.NETWORK_ID;
+    }
+    return 'nono-mainnet';
   }
 
   function getNodeStorageKey () {
-    return Networks.get(getSelectedNetworkId()).customNodeStorageKey;
+    try {
+      if (typeof Networks === 'undefined') return 'nono-web-node-url';
+      return Networks.get(getSelectedNetworkId()).customNodeStorageKey;
+    } catch (e) {
+      return 'nono-web-node-url';
+    }
   }
 
   function applySelectedNetwork () {
-    Networks.setActiveId(getSelectedNetworkId());
+    try {
+      if (typeof Networks !== 'undefined') Networks.setActiveId(getSelectedNetworkId());
+    } catch (e) {}
   }
 
-  if (networkSelect) {
+  if (networkSelect && typeof Networks !== 'undefined') {
     networkSelect.value = Networks.getActiveId();
     networkSelect.addEventListener('change', () => {
       applySelectedNetwork();
@@ -67,10 +96,6 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
   applySelectedNetwork();
-  const advInput = $el('adv-node-url');
-  const advMsg   = $el('adv-node-msg');
-  const advSave  = $el('adv-node-save');
-  const advReset = $el('adv-node-reset');
   if (advInput) {
     try { advInput.value = localStorage.getItem(getNodeStorageKey()) || ''; } catch (e) {}
     if (advMsg && advInput.value) {
@@ -181,8 +206,8 @@ document.addEventListener('DOMContentLoaded', () => {
   // then subtract blocks for the chosen time period. Computing from
   // genesis forward is inaccurate because Monero's average block time
   // over 12 years drifts from the target 120s.
-  const CHECKPOINT_HEIGHT = 3651000;
-  const CHECKPOINT_TS = Date.UTC(2026, 3, 13) / 1000; // April 13, 2026
+  const CHECKPOINT_HEIGHT = 15500;
+  const CHECKPOINT_TS = Date.UTC(2026, 2, 25) / 1000; // ~NONO mainnet tip late Mar 2026
   const SECS_PER_BLOCK = 120;
   const BLOCKS_PER_DAY = 720;
 
@@ -192,7 +217,19 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function ageToHeight(age) {
-    return age === 'unknown' ? 0 : 0;
+    if (age === 'unknown') return 0;
+    var tip = estimatedCurrentHeight();
+    var daysMap = {
+      week: 7,
+      month: 30,
+      '3months': 90,
+      '6months': 180,
+      year: 365,
+      '2years': 730,
+    };
+    var days = daysMap[age];
+    if (!days) return 0;
+    return Math.max(0, tip - Math.floor(days * BLOCKS_PER_DAY));
   }
 
   var restoreHeightEl = $el('restore-height');
@@ -586,4 +623,14 @@ document.addEventListener('DOMContentLoaded', () => {
       }, 100);
     });
   }
-});
+  } catch (e) {
+    showBootError(e);
+  }
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', boot);
+  } else {
+    boot();
+  }
+})();
