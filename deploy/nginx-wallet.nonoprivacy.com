@@ -29,6 +29,17 @@ server {
         proxy_connect_timeout 10s;
     }
 
+    location /api/proxy/ {
+        proxy_pass http://127.0.0.1:24701/;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_read_timeout 120s;
+        proxy_connect_timeout 10s;
+    }
+
     location /api/lws-nono/ {
         proxy_pass http://127.0.0.1:8470/;
         proxy_http_version 1.1;

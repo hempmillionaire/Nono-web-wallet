@@ -26,7 +26,7 @@ const MoneroRPC = (function () {
   // We pick one based on the deployment host so the same JS works on either.
   // (Cloudflare is the primary; Netlify is kept as a fallback for now.)
   // Picked per active network from js/networks.js (see setActiveNetwork).
-  let PROXY_URL = '/api/proxy';
+  let PROXY_URL = '/api/rpc-nono';
   // Per-network localStorage key for optional user-supplied direct node URL.
   let CUSTOM_NODE_KEY = 'nono-web-node-url';
   let activeNetworkId = 'nono-mainnet';
@@ -63,20 +63,49 @@ const MoneroRPC = (function () {
    */
   function getRpcBase() {
     const custom = getCustomNode();
-    if (custom) return custom.replace(/\/$/, '');
-    if (pinnedRpcBase) return pinnedRpcBase;
+    if (custom) return normalizeRpcBase(custom);
+    if (pinnedRpcBase) return normalizeRpcBase(pinnedRpcBase);
     if (typeof Networks !== 'undefined') {
       const eff = Networks.getEffectiveRpcUrl(activeNetworkId);
-      if (eff) return eff;
+      if (eff) return normalizeRpcBase(eff);
     }
     return '';
   }
 
-  async function jsonRpcToBase(base, method, params) {
+  /** Strip trailing slashes and duplicate /json_rpc from user-pasted URLs. */
+  function normalizeRpcBase(base) {
+    if (!base) return '';
+    let b = String(base).trim().replace(/\/+$/, '');
+    b = b.replace(/\/json_rpc$/i, '');
+    return b;
+  }
+
+  function buildJsonRpcUrl(base) {
     const proxyBase = (PROXY_URL || '/api/rpc-nono').replace(/\/$/, '');
-    const url = base
-      ? base.replace(/\/$/, '') + '/json_rpc'
-      : proxyBase + '/json_rpc';
+    const b = normalizeRpcBase(base);
+    return b ? b + '/json_rpc' : proxyBase + '/json_rpc';
+  }
+
+  function rpcBasesToTry() {
+    const seen = new Set();
+    const out = [];
+    function add(b) {
+      const key = normalizeRpcBase(b) || '__same_origin_proxy__';
+      if (seen.has(key)) return;
+      seen.add(key);
+      out.push(b);
+    }
+    if (typeof Networks !== 'undefined') {
+      for (const b of Networks.getEffectiveRpcUrlList(activeNetworkId)) add(b);
+    }
+    const custom = getCustomNode();
+    if (custom) add(custom);
+    add('');
+    return out;
+  }
+
+  async function jsonRpcToBase(base, method, params) {
+    const url = buildJsonRpcUrl(base);
     const body = { jsonrpc: '2.0', id: '0', method: method };
     if (params) body.params = params;
     const controller = new AbortController();
@@ -157,8 +186,9 @@ const MoneroRPC = (function () {
   async function rpcOther(path, params, nodeUrl) {
     const base = getRpcBase();
     const proxyBase = (PROXY_URL || '/api/rpc-nono').replace(/\/$/, '');
-    const url = base
-      ? base.replace(/\/$/, '') + path
+    const b = normalizeRpcBase(base);
+    const url = b
+      ? b + path
       : proxyBase + path;
 
     const controller = new AbortController();
@@ -221,14 +251,11 @@ const MoneroRPC = (function () {
 
     try {
       const start = Date.now();
-      const bases = (typeof Networks !== 'undefined')
-        ? Networks.getEffectiveRpcUrlList(activeNetworkId)
-        : [];
-      const tryBases = bases.length ? bases : [''];
+      const bases = rpcBasesToTry();
       let info = null;
       let usedBase = '';
       let lastErr = null;
-      for (const base of tryBases) {
+      for (const base of bases) {
         try {
           info = await jsonRpcToBase(base, 'get_info');
           usedBase = base;

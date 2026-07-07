@@ -1241,7 +1241,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     MoneroRPC.setCustomNode('');
     customNodeInput.value = '';
     nodeMsg.style.color = 'var(--text-dim)';
-    nodeMsg.textContent = 'Reverted to monero-web proxy. Reload to reconnect.';
+    nodeMsg.textContent = 'Reverted to default NONO RPC (/api/rpc-nono). Reload or hit Retry on the conn bar.';
   });
 
   // ─── QR scanner ───
