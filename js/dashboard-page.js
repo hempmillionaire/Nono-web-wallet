@@ -114,21 +114,16 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   // ─── Dashboard initialiser ──────────────────────────────────────────
-  function initDashboard() {
-    document.getElementById('loading-state').style.display = 'none';
-    document.getElementById('dashboard').style.display = 'block';
-    // Kick off the Turnstile→session handshake immediately so it runs in
-    // parallel with WASM/asset load instead of blocking the first balance
-    // request. Fire-and-forget; the lazy path still covers any failure.
+  async function initDashboard() {
+    // Stay on loading UI until connectAndPopulate() succeeds — do not show
+    // #dashboard early or the conn bar sticks on the static HTML placeholder.
     if (typeof LwsClient !== 'undefined' && LwsClient.prewarm && LwsClient.isAvailable()) {
       LwsClient.prewarm();
     }
-    // Preload WASM in background so it's ready for key_image verification
-    // and send. Don't await — let it load while the dashboard connects.
     if (typeof MoneroCore !== 'undefined') {
-      MoneroCore.load().catch(function () {}); // fire-and-forget
+      MoneroCore.load().catch(function () {});
     }
-    populateWallet();
+    await populateWallet();
     installIdleListeners();
   }
 
@@ -145,6 +140,25 @@ document.addEventListener('DOMContentLoaded', async () => {
   if (networkBadge) networkBadge.textContent = netCfg.displayName + ' · ' + netCfg.ticker;
   if (balanceTicker) balanceTicker.textContent = netCfg.ticker;
 
+  const connDot = document.getElementById('conn-dot');
+  const connInfo = document.getElementById('conn-info');
+
+  function updateConnBar (state) {
+    if (!connDot || !connInfo) return;
+    connDot.className = 'conn-dot ' + (state.status || 'connecting');
+    if (state.status === 'connected') {
+      connInfo.innerHTML = '<span>' + escapeHtml(state.node || 'NONO RPC') + '</span> · <span class="conn-height">' + (state.height ? state.height.toLocaleString() : '—') + '</span>';
+    } else if (state.status === 'connecting') {
+      connInfo.textContent = state.message || 'Connecting to NONO network…';
+    } else {
+      connInfo.innerHTML = '<span style="color:#f87171">' + escapeHtml(state.message || 'Disconnected') + '</span> · <a href="#" id="conn-retry" style="color:var(--xmr);text-decoration:underline;cursor:pointer">retry</a>';
+      const r = document.getElementById('conn-retry');
+      if (r) r.addEventListener('click', (e) => { e.preventDefault(); connectAndPopulate(); });
+    }
+  }
+
+  MoneroRPC.onConnectionChange(updateConnBar);
+
   function updateLwsUnavailableBanner () {
     const banner = document.getElementById('lws-unavailable-banner');
     if (!banner) return;
@@ -159,6 +173,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   }
   updateLwsUnavailableBanner();
+  const balanceNoteEl = document.getElementById('balance-note');
+  if (balanceNoteEl && typeof LwsClient !== 'undefined' && !LwsClient.isAvailable()) {
+    balanceNoteEl.textContent = 'Waiting for light-wallet server (LWS) — balance will appear after LWS is online.';
+  }
 
   function refreshPrimaryAddressDisplay () {
     const addrEl = document.getElementById('wallet-address');
@@ -405,25 +423,6 @@ document.addEventListener('DOMContentLoaded', async () => {
       const hidden = value.classList.toggle('hidden');
       toggle.textContent = hidden ? 'Show' : 'Hide';
     });
-  });
-
-  // ─── Connect to node ───
-  const connDot = document.getElementById('conn-dot');
-  const connInfo = document.getElementById('conn-info');
-
-  MoneroRPC.onConnectionChange((state) => {
-    connDot.className = 'conn-dot ' + state.status;
-    if (state.status === 'connected') {
-      connInfo.innerHTML = '<span>' + escapeHtml(state.node) + '</span> · <span class="conn-height">' + (state.height ? state.height.toLocaleString() : '—') + '</span>';
-    } else if (state.status === 'connecting') {
-      connInfo.textContent = state.message || 'Connecting…';
-    } else {
-      // Disconnected — surface a retry link inline so the user doesn't have
-      // to reload the whole page to recover from a transient proxy outage.
-      connInfo.innerHTML = '<span style="color:#f87171">' + escapeHtml(state.message || 'Disconnected') + '</span> · <a href="#" id="conn-retry" style="color:var(--xmr);text-decoration:underline;cursor:pointer">retry</a>';
-      const r = document.getElementById('conn-retry');
-      if (r) r.addEventListener('click', (e) => { e.preventDefault(); connectAndPopulate(); });
-    }
   });
 
   // ─── XMR/USD price ───
@@ -909,6 +908,12 @@ document.addEventListener('DOMContentLoaded', async () => {
       document.getElementById('net-height').textContent   = node.height ? node.height.toLocaleString() : '—';
       document.getElementById('net-latency').textContent  = node.latency + 'ms';
       document.getElementById('net-pool').textContent     = node.txPoolSize || '0';
+
+      updateConnBar({
+        status: 'connected',
+        node: node.name,
+        height: node.height,
+      });
 
       try {
         const fee = await MoneroRPC.getFeeEstimate();
