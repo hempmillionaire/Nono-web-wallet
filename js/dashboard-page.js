@@ -497,6 +497,46 @@ document.addEventListener('DOMContentLoaded', async () => {
     return { received: received, sent: sent, net: net };
   }
 
+  /** Wallet-level verified spend total (deduped), using address + per-tx spent_outputs. */
+  function aggregateVerifiedSentAtomic (info, txs) {
+    var seen = {};
+    var verified = 0n;
+    function walk (list) {
+      if (!list) return;
+      for (var so of list) {
+        var cacheKey = so.tx_pub_key + ':' + so.out_index;
+        if (seen[cacheKey]) continue;
+        seen[cacheKey] = true;
+        var real = _keyImageCache[cacheKey];
+        if (real && real === so.key_image) {
+          verified += BigInt(so.amount || '0');
+        }
+      }
+    }
+    if (info && info.spent_outputs) walk(info.spent_outputs);
+    if (Array.isArray(txs)) {
+      for (var i = 0; i < txs.length; i++) {
+        walk(txs[i].spent_outputs);
+      }
+    }
+    return verified;
+  }
+
+  /** Incoming funds still confirming — use tx net, not raw LWS locked (ring-decoy skew). */
+  function lockedIncomingFromTxs (txs, chainTip) {
+    var locked = 0n;
+    if (!Array.isArray(txs)) return locked;
+    for (var tx of txs) {
+      var effect = txNetWalletEffect(tx);
+      if (effect.net <= 0n) continue;
+      var confirms = tx.mempool ? 0 : Math.max(0, chainTip - (tx.height || 0));
+      if (tx.mempool || confirms < 10) {
+        locked += effect.net;
+      }
+    }
+    return locked;
+  }
+
   function explorerUrlForTx (fullHash) {
     if (typeof Networks !== 'undefined' && Networks.explorerTxUrl) {
       return Networks.explorerTxUrl(fullHash, walletKeys && walletKeys.network);
@@ -669,17 +709,32 @@ document.addEventListener('DOMContentLoaded', async () => {
     const balEl  = document.getElementById('balance-xmr');
     const noteEl = document.getElementById('balance-note');
     try {
-      const info = await LwsClient.getAddressInfo(walletKeys.address, walletKeys.privateViewKeyHex);
+      const [info, txResp] = await Promise.all([
+        LwsClient.getAddressInfo(walletKeys.address, walletKeys.privateViewKeyHex),
+        LwsClient.getAddressTxs(walletKeys.address, walletKeys.privateViewKeyHex),
+      ]);
+      var txs = (txResp && Array.isArray(txResp.transactions)) ? txResp.transactions : [];
+      var chainTip = (txResp && txResp.blockchain_height) || info.blockchain_height || 0;
 
-      // ── Client-side key_image verification ──
-      // The LWS flags outputs as "spent" whenever their global index
-      // appears in ANY transaction's ring signature — including as a
-      // decoy in other people's transactions. We compute the REAL
-      // key_image for each output using the spend key (via WASM) and
-      // only count spends where the key_image matches. Mismatches are
-      // false positives from ring-decoy appearances.
-      if (info && Array.isArray(info.spent_outputs) && info.spent_outputs.length > 0
-          && walletKeys.privateSpendKeyHex && !walletKeys.watchOnly) {
+      // ── Client-side key_image verification (address + per-tx spends) ──
+      if (!isWatchOnly && walletKeys.privateSpendKeyHex) {
+        await ensureKeyImagesForSpends(info && info.spent_outputs);
+        for (var ti = 0; ti < txs.length; ti++) {
+          await ensureKeyImagesForSpends(txs[ti].spent_outputs);
+        }
+      }
+
+      if (info && !isWatchOnly && walletKeys.privateSpendKeyHex) {
+        var verifiedSent = aggregateVerifiedSentAtomic(info, txs);
+        info.total_sent = verifiedSent.toString();
+        var lwsLocked = BigInt(info.locked_funds || '0');
+        var clientLocked = lockedIncomingFromTxs(txs, chainTip);
+        if (clientLocked > lwsLocked) {
+          info.locked_funds = clientLocked.toString();
+        }
+      } else if (info && Array.isArray(info.spent_outputs) && info.spent_outputs.length > 0
+          && walletKeys.privateSpendKeyHex && !isWatchOnly) {
+        // Legacy path if parallel tx fetch failed shape — kept for safety
         var falseSpendTotal = 0n;
         try {
           if (!MoneroCore.isLoaded()) await MoneroCore.load();
@@ -695,7 +750,6 @@ document.addEventListener('DOMContentLoaded', async () => {
                   so.out_index
                 );
               } catch (kiErr) {
-                // If key_image computation fails for this output, skip it
                 console.warn('[lws] key_image compute failed for ' + cacheKey + ':', kiErr);
                 continue;
               }
@@ -708,40 +762,9 @@ document.addEventListener('DOMContentLoaded', async () => {
             var correctedSent = BigInt(info.total_sent || '0') - falseSpendTotal;
             if (correctedSent < 0n) correctedSent = 0n;
             info.total_sent = correctedSent.toString();
-            console.log('[lws] filtered ' + falseSpendTotal.toString() + ' piconero of false spends');
           }
         } catch (e) {
-          // WASM failed to load — use heuristic fallbacks
           console.warn('[lws] key_image verification unavailable:', e.message);
-          var totalRecv = BigInt(info.total_received || '0');
-          var totalSent = BigInt(info.total_sent || '0');
-
-          // Heuristic 1: dedup by (tx_pub_key, out_index) — same output
-          // can't be spent more than once
-          if (info.spent_outputs.length > 1) {
-            var seen = {};
-            var dedupTotal = 0n;
-            for (var so of info.spent_outputs) {
-              var key = so.tx_pub_key + ':' + so.out_index;
-              if (seen[key]) {
-                dedupTotal += BigInt(so.amount || '0');
-              } else {
-                seen[key] = true;
-              }
-            }
-            if (dedupTotal > 0n) {
-              totalSent -= dedupTotal;
-              if (totalSent < 0n) totalSent = 0n;
-            }
-          }
-
-          // Heuristic 2: total_sent can never exceed total_received
-          // (you can't spend more than you received). Clamp it.
-          if (totalSent > totalRecv) {
-            totalSent = totalRecv;
-          }
-
-          info.total_sent = totalSent.toString();
         }
       }
 
@@ -789,8 +812,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         lockedEl.style.display = 'none';
       }
 
-      // Refresh tx history in parallel on the same cadence
-      pollTxHistoryOnce();
+      // Refresh tx history using the same LWS response (no duplicate fetch)
+      pollTxHistoryOnce(txResp);
       // Drive the scanning progress bar
       var scanWrap = document.getElementById('scan-bar-wrap');
       var scanFill = document.getElementById('scan-bar-fill');
@@ -834,12 +857,12 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Runs alongside the balance poll — same 30-second cadence. Fetches
   // the wallet's full tx list from the LWS and renders it into #tx-list.
   // Safe to call before the LWS is up (it just shows a loading state).
-  async function pollTxHistoryOnce () {
+  async function pollTxHistoryOnce (cachedResp) {
     if (!lwsRegistered) return;
     const listEl = document.getElementById('tx-list');
     if (!listEl) return;
     try {
-      const resp = await LwsClient.getAddressTxs(walletKeys.address, walletKeys.privateViewKeyHex);
+      const resp = cachedResp || await LwsClient.getAddressTxs(walletKeys.address, walletKeys.privateViewKeyHex);
       var txs = (resp && Array.isArray(resp.transactions)) ? resp.transactions : [];
       const chainTip = (resp && resp.blockchain_height) || 0;
 

@@ -205,8 +205,8 @@
         seedFormat.textContent = fmt.icon + ' ' + fmt.name;
       }
       // Polyseed (16 words) has embedded birthday — no age selection needed.
-      // For all other formats, require a wallet-age button click first.
-      if (count === 16 || walletAgeSelected) {
+      // 25-word NONO standard: allow derive without age (restore height optional).
+      if (count === 16 || count === 25 || walletAgeSelected) {
         btnSeed.disabled = false;
       }
     }
@@ -214,8 +214,31 @@
     const bip39Grp = document.getElementById('bip39-pass-group');
     if (bip39Grp) bip39Grp.style.display = (count === 12) ? 'block' : 'none';
   }
+
+  function normalizeSeedText (raw) {
+    return String(raw || '')
+      .replace(/[\u00a0\u2007\u202f]/g, ' ')
+      .replace(/[\r\n\t]+/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+  }
+
+  function onSeedFieldUpdate () {
+    if (!seedInput) return;
+    var normalized = normalizeSeedText(seedInput.value);
+    if (normalized !== seedInput.value) {
+      seedInput.value = normalized;
+    }
+    refreshDeriveBtn();
+  }
+
   if (seedInput) {
-    seedInput.addEventListener('input', refreshDeriveBtn);
+    seedInput.addEventListener('input', onSeedFieldUpdate);
+    seedInput.addEventListener('paste', function () {
+      setTimeout(onSeedFieldUpdate, 0);
+    });
+    seedInput.addEventListener('change', onSeedFieldUpdate);
+    seedInput.addEventListener('keyup', onSeedFieldUpdate);
   }
 
   // ─── WALLET AGE BUTTONS → restore height ───
