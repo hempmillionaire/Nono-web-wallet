@@ -490,10 +490,12 @@ const LwsClient = (function () {
     else n = BigInt(Math.round(Number(atomic) || 0));
     const sign = n < 0n ? '-' : '';
     if (n < 0n) n = -n;
-    const whole = n / 1000000000000n;
-    const frac  = n % 1000000000000n;
+    const mul = 10000000000n; // NONO fallback: 10 decimal places
+    const whole = n / mul;
+    const frac  = n % mul;
     if (frac === 0n) return sign + whole.toString();
-    let fracStr = frac.toString().padStart(12, '0');
+    const dec = (typeof Networks !== 'undefined') ? Networks.getAtomicDecimals(activeNetworkId) : 10;
+    let fracStr = frac.toString().padStart(dec, '0');
     fracStr = fracStr.replace(/0+$/, '');
     return sign + whole.toString() + '.' + fracStr;
   }

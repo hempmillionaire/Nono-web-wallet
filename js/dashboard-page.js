@@ -468,6 +468,68 @@ document.addEventListener('DOMContentLoaded', async () => {
   let lwsRegistered = false;
   var _keyImageCache = {}; // tx_pub_key:out_index → real key_image
 
+  /**
+   * Sum only spends we can cryptographically verify (real key_image match).
+   * LWS often inflates total_sent when our outputs appear as ring decoys in
+   * incoming txs — that produced +32 instead of +332 and phantom sends.
+   */
+  function verifiedSentAtomic (tx) {
+    if (isWatchOnly || !tx) return 0n;
+    if (!tx.spent_outputs || tx.spent_outputs.length === 0) {
+      return 0n;
+    }
+    var verified = 0n;
+    for (var so of tx.spent_outputs) {
+      var cacheKey = so.tx_pub_key + ':' + so.out_index;
+      var real = _keyImageCache[cacheKey];
+      if (real && real === so.key_image) {
+        verified += BigInt(so.amount || '0');
+      }
+    }
+    return verified;
+  }
+
+  /** Net wallet effect for one tx (atomic units): received − verified spends. */
+  function txNetWalletEffect (tx) {
+    var received = BigInt(tx.total_received || '0');
+    var sent = verifiedSentAtomic(tx);
+    var net = received - sent;
+    return { received: received, sent: sent, net: net };
+  }
+
+  function explorerUrlForTx (fullHash) {
+    if (typeof Networks !== 'undefined' && Networks.explorerTxUrl) {
+      return Networks.explorerTxUrl(fullHash, walletKeys && walletKeys.network);
+    }
+    return 'https://explorer.nonoprivacy.com/tx/' + encodeURIComponent(fullHash || '');
+  }
+
+  async function ensureKeyImagesForSpends (spentOutputs) {
+    if (!spentOutputs || !spentOutputs.length || isWatchOnly || !walletKeys.privateSpendKeyHex) {
+      return;
+    }
+    try {
+      if (!MoneroCore.isLoaded()) await MoneroCore.load();
+      for (var so of spentOutputs) {
+        var cacheKey = so.tx_pub_key + ':' + so.out_index;
+        if (_keyImageCache[cacheKey]) continue;
+        try {
+          _keyImageCache[cacheKey] = MoneroCore.generateKeyImage(
+            so.tx_pub_key,
+            walletKeys.privateViewKeyHex,
+            walletKeys.publicSpendKeyHex,
+            walletKeys.privateSpendKeyHex,
+            so.out_index
+          );
+        } catch (kiErr) {
+          console.warn('[lws] key_image compute failed for ' + cacheKey + ':', kiErr);
+        }
+      }
+    } catch (e) {
+      console.warn('[lws] key_image verification unavailable:', e.message);
+    }
+  }
+
   async function startBalancePolling () {
     const balEl  = document.getElementById('balance-xmr');
     const noteEl = document.getElementById('balance-note');
@@ -781,6 +843,14 @@ document.addEventListener('DOMContentLoaded', async () => {
       var txs = (resp && Array.isArray(resp.transactions)) ? resp.transactions : [];
       const chainTip = (resp && resp.blockchain_height) || 0;
 
+      if (!isWatchOnly) {
+        for (var ti = 0; ti < txs.length; ti++) {
+          if (txs[ti].spent_outputs && txs[ti].spent_outputs.length) {
+            await ensureKeyImagesForSpends(txs[ti].spent_outputs);
+          }
+        }
+      }
+
       // Watch-only mode: no spend key → can't verify outgoing txs.
       // Show only incoming transactions (those with total_received > 0).
       if (isWatchOnly) {
@@ -789,19 +859,18 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
       }
 
-      // Filter out false-spend transactions using the key_image cache
-      // built by pollBalanceOnce(). If every spent_output in a tx has a
-      // key_image that doesn't match the computed real key_image, the
-      // tx is a false positive from ring-decoy detection — hide it.
-      if (!isWatchOnly && Object.keys(_keyImageCache).length > 0) {
+      // Drop ring-decoy / false-spend txs and compute per-tx net from verified spends only.
+      if (!isWatchOnly) {
         txs = txs.filter(function (tx) {
-          if (!tx.spent_outputs || tx.spent_outputs.length === 0) return true;
-          for (var so of tx.spent_outputs) {
-            var cacheKey = so.tx_pub_key + ':' + so.out_index;
-            var real = _keyImageCache[cacheKey];
-            if (!real || real === so.key_image) return true; // real or unknown
+          var effect = txNetWalletEffect(tx);
+          if (effect.net === 0n && effect.received === 0n && effect.sent === 0n) {
+            return false;
           }
-          return false; // all spent_outputs are false positives
+          if (effect.net === 0n && effect.received > 0n && effect.sent > 0n) {
+            // Change-only or internal bookkeeping — hide zero net rows.
+            return false;
+          }
+          return effect.net !== 0n || effect.received > 0n;
         });
       }
 
@@ -818,9 +887,10 @@ document.addEventListener('DOMContentLoaded', async () => {
       });
 
       const rows = txs.map(tx => {
-        const received = BigInt(tx.total_received || '0');
-        const sent     = isWatchOnly ? 0n : BigInt(tx.total_sent || '0');
-        const net      = received - sent;
+        const effect   = txNetWalletEffect(tx);
+        const received = effect.received;
+        const sent     = effect.sent;
+        const net      = effect.net;
         const isIn     = net >= 0n;
         const display  = LwsClient.formatXmr(net < 0n ? -net : net);
         const confirms = tx.mempool ? 0 : Math.max(0, chainTip - (tx.height || 0));
@@ -836,7 +906,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         const fullHash = tx.hash || '';
         const feeDisplay = tx.fee && tx.fee !== '0' ? LwsClient.formatXmr(tx.fee) : '—';
         const paymentId  = tx.payment_id && tx.payment_id !== '0000000000000000' ? tx.payment_id : '';
-        const explorerUrl = 'https://www.exploremonero.com/transaction/' + encodeURIComponent(fullHash);
+        const explorerUrl = explorerUrlForTx(fullHash);
 
         // Detail panel (hidden by default, toggled on click)
         var detailRows = '';

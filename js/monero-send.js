@@ -19,8 +19,14 @@
 const MoneroSend = (function () {
   'use strict';
 
-  const ATOMIC_PER_XMR = 1000000000000n;
   const DEFAULT_MIXIN = 15;
+
+  function atomicMultiplierFor (networkId) {
+    if (typeof Networks !== 'undefined') {
+      return Networks.atomicMultiplier(networkId || 'nono-mainnet');
+    }
+    return 10000000000n; // NONO: 10 decimal places
+  }
 
   // ── Address validation (no WASM needed) ───────────────────────────
 
@@ -60,8 +66,10 @@ const MoneroSend = (function () {
     if (!/^[0-9]+(\.[0-9]+)?$/.test(s)) throw new Error('Invalid amount');
     var parts = s.split('.');
     var whole = parts[0] || '0';
-    var frac = (parts[1] || '').padEnd(12, '0').substring(0, 12);
-    return (BigInt(whole) * ATOMIC_PER_XMR + BigInt(frac)).toString();
+    var dec = (typeof Networks !== 'undefined') ? Networks.getAtomicDecimals(networkId) : 10;
+    var frac = (parts[1] || '').padEnd(dec, '0').substring(0, dec);
+    var mul = atomicMultiplierFor(networkId);
+    return (BigInt(whole) * mul + BigInt(frac)).toString();
   }
 
   function atomicToXmr (atomic, networkId) {
@@ -70,10 +78,12 @@ const MoneroSend = (function () {
       return Networks.formatAtomic(atomic, id);
     }
     var n = BigInt(String(atomic || '0'));
-    var whole = n / ATOMIC_PER_XMR;
-    var frac = n % ATOMIC_PER_XMR;
+    var mul = atomicMultiplierFor(id);
+    var whole = n / mul;
+    var frac = n % mul;
     if (frac === 0n) return whole.toString();
-    var fracStr = frac.toString().padStart(12, '0').replace(/0+$/, '');
+    var dec = (typeof Networks !== 'undefined') ? Networks.getAtomicDecimals(id) : 10;
+    var fracStr = frac.toString().padStart(dec, '0').replace(/0+$/, '');
     return whole.toString() + '.' + fracStr;
   }
 

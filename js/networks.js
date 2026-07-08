@@ -35,6 +35,7 @@ const Networks = (function () {
       expectedAddressHint: 'starts with N',
       rpcPort: 24701,
       p2pPort: 24700,
+      explorerBaseUrl: 'https://explorer.nonoprivacy.com',
     },
   };
 
@@ -157,6 +158,21 @@ const Networks = (function () {
     return formatAtomic(atomic, id) + ' ' + get(id).ticker;
   }
 
+  /** Canonical NONO explorer transaction link (not Monero explorers). */
+  function explorerTxUrl(txHash, idOrLegacy) {
+    const id = resolve(idOrLegacy || getActiveId());
+    const base = String(get(id).explorerBaseUrl || 'https://explorer.nonoprivacy.com').replace(/\/$/, '');
+    const hash = String(txHash || '').trim();
+    return hash ? base + '/tx/' + encodeURIComponent(hash) : base;
+  }
+
+  function explorerBlockUrl(blockHashOrHeight, idOrLegacy) {
+    const id = resolve(idOrLegacy || getActiveId());
+    const base = String(get(id).explorerBaseUrl || 'https://explorer.nonoprivacy.com').replace(/\/$/, '');
+    const ref = String(blockHashOrHeight || '').trim();
+    return ref ? base + '/block/' + encodeURIComponent(ref) : base;
+  }
+
   return {
     NETWORK_ID,
     REGISTRY,
@@ -176,6 +192,8 @@ const Networks = (function () {
     getAddressPrefix,
     getSubaddressPrefix,
     formatTickerAmount,
+    explorerTxUrl,
+    explorerBlockUrl,
   };
 })();
 
