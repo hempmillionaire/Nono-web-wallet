@@ -50,10 +50,12 @@ const MoneroCore = (function () {
         throw new Error(_loadError);
       }
       try {
+        const wasmJsUrl = new URL(WASM_DIR + 'MyMoneroCoreCpp_WASM.js', window.location.href).href;
         _module = await MyMoneroClient({
           locateFile: function (filename) {
             return WASM_DIR + filename;
           },
+          mainScriptUrlOrBlob: wasmJsUrl,
         });
         _loadError = null;
         return _module;
