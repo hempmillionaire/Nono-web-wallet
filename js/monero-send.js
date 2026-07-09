@@ -73,6 +73,57 @@ const MoneroSend = (function () {
     return _sendTrace;
   }
 
+  function netParams (walletKeys) {
+    var nid = networkIdFromKeys(walletKeys);
+    var cfg = (typeof Networks !== 'undefined') ? Networks.get(nid) : {};
+    return {
+      netId: nid,
+      nettype: 'MAINNET',
+      forkVersion: String(cfg.hardForkVersion != null ? cfg.hardForkVersion : 16),
+      mixin: (cfg.defaultMixin != null ? cfg.defaultMixin : DEFAULT_MIXIN),
+    };
+  }
+
+  /** MyMonero WASM only accepts a strict subset of LWS output fields. */
+  function sanitizeSpendableOut (raw) {
+    var out = {
+      amount: String(raw.amount),
+      public_key: raw.public_key,
+      global_index: String(raw.global_index),
+      index: String(raw.index != null ? raw.index : 0),
+      tx_pub_key: raw.tx_pub_key,
+    };
+    if (raw.rct && raw.rct !== '') out.rct = raw.rct;
+    return out;
+  }
+
+  function normalizeMixOuts (amountOuts) {
+    return (amountOuts || []).map(function (ao) {
+      var ring = ao.outputs || ao.outs || [];
+      return {
+        amount: String(ao.amount != null ? ao.amount : '0'),
+        outputs: ring.map(function (m) {
+          var row = {
+            global_index: String(m.global_index),
+            public_key: m.public_key,
+          };
+          if (m.rct) row.rct = m.rct;
+          return row;
+        }),
+      };
+    });
+  }
+
+  function validateMixRings (mixOuts, ringSize) {
+    for (var i = 0; i < mixOuts.length; i++) {
+      var n = (mixOuts[i].outputs || []).length;
+      if (n < ringSize) {
+        return 'Ring ' + i + ' has only ' + n + ' decoys but needs at least ' + ringSize;
+      }
+    }
+    return null;
+  }
+
   function atomicMultiplierFor (networkId) {
     if (typeof Networks !== 'undefined') {
       return Networks.atomicMultiplier(networkId || 'nono-mainnet');
@@ -260,101 +311,105 @@ const MoneroSend = (function () {
       throw new Error('No spendable outputs available. Your funds may still be confirming — wait a few minutes and try again.');
     }
 
-    // 2. Select outputs to spend (simple: use all, let WASM compute change)
+    var np = netParams(walletKeys);
     var perByteFee = Number(unspentResp.per_byte_fee || unspentResp.per_kb_fee / 1024 || 20);
     var feeMask = Number(unspentResp.fee_mask || 10000);
-    var mult = PRIO_MULT[priority] || 4;
-    var estFee = Math.ceil(perByteFee * TYPICAL_TX_BYTES * mult);
-    if (feeMask > 0) estFee = Math.ceil(estFee / feeMask) * feeMask;
+    var sanitizedUnspent = spendableOuts.map(sanitizeSpendableOut);
 
-    var totalAvailable = 0n;
-    var selectedOuts = [];
-    // Sort by amount descending — pick fewest outputs needed
-    spendableOuts.sort(function (a, b) {
-      return Number(BigInt(b.amount) - BigInt(a.amount));
-    });
-    for (var i = 0; i < spendableOuts.length; i++) {
-      selectedOuts.push(spendableOuts[i]);
-      totalAvailable += BigInt(spendableOuts[i].amount);
-      if (totalAvailable >= amountAtomic + BigInt(estFee)) break;
-    }
-
-    if (totalAvailable < amountAtomic + BigInt(estFee)) {
-      var nid = networkIdFromKeys(walletKeys);
-      var sym = (typeof Networks !== 'undefined') ? Networks.get(nid).ticker : 'NONO';
-      failSend('output_selection', 'Insufficient funds: need ' +
-        atomicToXmr((amountAtomic + BigInt(estFee)).toString(), nid) +
-        ' ' + sym + ' but only have ' + atomicToXmr(totalAvailable.toString(), nid) + ' ' + sym, {
-        selectedOutputs: selectedOuts.length,
-        totalAvailable: totalAvailable.toString(),
+    // 2. WASM step1 — output selection, fee, mixin (MyMonero-native path)
+    var step1;
+    try {
+      step1 = MoneroCore.sendStep1({
+        is_sweeping: '0',
+        payment_id_string: paymentId || '',
+        sending_amount: amountAtomic.toString(),
+        priority: String(priority || 2),
+        fee_per_b: String(perByteFee),
+        fee_mask: String(feeMask),
+        fork_version: np.forkVersion,
+        unspent_outs: sanitizedUnspent,
+        nettype_string: np.nettype,
+      });
+      traceSend('tx_plan', {
+        mixin: step1.mixin,
+        fee_amount: step1.fee_amount,
+        change_amount: step1.change_amount,
+        using_outs: step1.using_outs ? step1.using_outs.length : 0,
+      });
+    } catch (e) {
+      failSend('tx_plan', 'Transaction planning failed: ' + wasmExceptionMessage(e), {
+        fork_version: np.forkVersion,
+        spendable: sanitizedUnspent.length,
       });
     }
 
-    var feeAmount = BigInt(estFee);
-    var changeAmount = totalAvailable - amountAtomic - feeAmount;
+    var wasmOutputs = (step1.using_outs || []).map(sanitizeSpendableOut);
+    if (!wasmOutputs.length) {
+      failSend('tx_plan', 'Transaction planning returned no spendable outputs', { step1: step1 });
+    }
+
+    var feeAmount = BigInt(step1.fee_amount || step1.required_fee || '0');
+    var changeAmount = BigInt(step1.change_amount || '0');
+    var finalTotal = BigInt(step1.final_total_wo_fee || amountAtomic.toString());
+    var mixin = parseInt(step1.mixin, 10);
+    if (!mixin || mixin < 1) mixin = np.mixin;
+    var ringSize = mixin + 1;
 
     traceSend('output_selection', {
-      selectedOutputs: selectedOuts.length,
+      selectedOutputs: wasmOutputs.length,
       feeAtomic: String(feeAmount),
       changeAtomic: String(changeAmount),
+      mixin: mixin,
+      ringSize: ringSize,
     });
 
     // 3. Fetch ring decoys
-    var decoyAmounts = selectedOuts.map(function () { return '0'; });
+    var decoyAmounts = wasmOutputs.map(function () { return '0'; });
     var mixResp;
     try {
-      mixResp = await LwsClient.getRandomOuts(decoyAmounts, DEFAULT_MIXIN + 1);
+      mixResp = await LwsClient.getRandomOuts(decoyAmounts, ringSize);
     } catch (e) {
       failSend('decoys_fetch', 'Failed to fetch ring decoys: ' + wasmExceptionMessage(e), {});
     }
     if (!mixResp || !Array.isArray(mixResp.amount_outs)) {
       failSend('decoys_fetch', 'Failed to fetch ring decoys from server (empty response)', { mixResp: mixResp });
     }
-    traceSend('decoys_fetch', { rings: mixResp.amount_outs.length });
-
-    // 4. Normalize output formats for WASM
-    var wasmOutputs = selectedOuts.map(function (o) {
-      var out = {
-        amount: String(o.amount),
-        public_key: o.public_key,
-        index: String(o.index || 0),
-        global_index: String(o.global_index),
-        tx_pub_key: o.tx_pub_key,
-        rct: o.rct || '',
-      };
-      if (o.spend_key_images) out.spend_key_images = o.spend_key_images;
-      if (o.tx_id !== undefined) out.tx_id = String(o.tx_id);
-      if (o.tx_hash) out.tx_hash = o.tx_hash;
-      if (o.tx_prefix_hash) out.tx_prefix_hash = o.tx_prefix_hash;
-      if (o.height !== undefined) out.height = String(o.height);
-      if (o.timestamp) out.timestamp = o.timestamp;
-      if (o.recipient) out.recipient = o.recipient;
-      return out;
+    var mixOuts = normalizeMixOuts(mixResp.amount_outs);
+    var ringErr = validateMixRings(mixOuts, ringSize);
+    if (ringErr) {
+      failSend('decoys_fetch', ringErr + ' — chain may be too young for mixin ' + mixin + '; try again later or lower mixin in network config.', {
+        ringSize: ringSize,
+        rings: mixOuts.map(function (r) { return (r.outputs || []).length; }),
+      });
+    }
+    traceSend('decoys_fetch', {
+      rings: mixOuts.length,
+      membersPerRing: mixOuts.map(function (r) { return (r.outputs || []).length; }),
     });
 
-    // 5. Build and sign via WASM (synchronous — no async callbacks)
-
+    // 4. Build and sign via WASM
     var step2Params = {
       from_address_string: walletKeys.address,
       sec_viewKey_string: walletKeys.privateViewKeyHex,
       sec_spendKey_string: walletKeys.privateSpendKeyHex,
       to_address_string: toAddress,
-      final_total_wo_fee: amountAtomic.toString(),
+      final_total_wo_fee: finalTotal.toString(),
       change_amount: changeAmount.toString(),
       fee_amount: feeAmount.toString(),
       priority: String(priority || 2),
       fee_per_b: String(perByteFee),
       fee_mask: String(feeMask),
       using_outs: wasmOutputs,
-      mix_outs: mixResp.amount_outs,
+      mix_outs: mixOuts,
       unlock_time: '0',
-      nettype_string: 'MAINNET',
+      nettype_string: np.nettype,
+      fork_version: np.forkVersion,
     };
     if (paymentId) step2Params.payment_id_string = paymentId;
 
     var step2Result;
     try {
-      traceSend('tx_sign', { inputs: wasmOutputs.length, mixin: DEFAULT_MIXIN });
+      traceSend('tx_sign', { inputs: wasmOutputs.length, mixin: mixin, fork: np.forkVersion });
       step2Result = MoneroCore.sendStep2(step2Params);
       traceSend('tx_sign', {
         ok: !!(step2Result && step2Result.serialized_signed_tx),
@@ -409,7 +464,7 @@ const MoneroSend = (function () {
     return {
       tx_hash: step2Result.tx_hash,
       tx_key: step2Result.tx_key || '',
-      mixin: DEFAULT_MIXIN,
+      mixin: mixin,
     };
   }
 

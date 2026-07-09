@@ -129,7 +129,28 @@ const MoneroCore = (function () {
         throw new Error('sendStep2: missing required parameter "' + k + '"');
       }
     }
-    const ret = _module.send_step2__try_create_transaction(JSON.stringify(params));
+    let ret;
+    try {
+      ret = _module.send_step2__try_create_transaction(JSON.stringify(params));
+    } catch (e) {
+      let msg = 'WASM signing exception';
+      if (typeof e === 'number') {
+        try {
+          if (_module.UTF8ToString) {
+            const s = _module.UTF8ToString(e);
+            if (s) msg = s;
+            else msg = 'WASM native exception (code ' + e + ')';
+          }
+        } catch (x) {
+          msg = 'WASM native exception (code ' + e + ')';
+        }
+      } else if (e && e.message) {
+        msg = e.message;
+      } else {
+        msg = String(e);
+      }
+      throw new Error('sendStep2: ' + msg);
+    }
     const parsed = JSON.parse(ret);
     if (parsed.err_msg) throw new Error('sendStep2: ' + parsed.err_msg);
     return parsed;

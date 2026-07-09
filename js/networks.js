@@ -36,6 +36,10 @@ const Networks = (function () {
       rpcPort: 24701,
       p2pPort: 24700,
       explorerBaseUrl: 'https://explorer.nonoprivacy.com',
+      /** Current daemon hard-fork version (for MyMonero WASM send_step1/2). */
+      hardForkVersion: 16,
+      /** Ring size: mixin count (decoys = mixin + 1 in get_random_outs). */
+      defaultMixin: 15,
     },
   };
 
