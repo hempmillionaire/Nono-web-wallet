@@ -478,11 +478,19 @@ footer p{font-size:.65rem;color:var(--text-dim)}
             <div style="font-family:'JetBrains Mono',monospace;font-size:.62rem;color:var(--text-mid);word-break:break-all;padding:10px 12px;background:var(--surface-2);border:1px solid var(--border);border-radius:8px;margin-bottom:14px" id="send-result-hash"></div>
             <button id="send-done" class="action-btn primary" style="width:100%">Done</button>
           </div>
-          <div id="send-result-error" style="display:none">
-            <svg width="48" height="48" fill="none" stroke="#f87171" stroke-width="1.8" viewBox="0 0 24 24" style="margin:0 auto 12px"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-            <h3 style="font-size:1rem;font-weight:600;margin-bottom:6px;color:#f87171">Send failed</h3>
-            <p id="send-result-error-msg" style="font-size:.72rem;color:var(--text-dim);line-height:1.5;margin-bottom:14px"></p>
-            <button id="send-retry" class="action-btn" style="width:100%">Back to form</button>
+          <div id="send-result-error" style="display:none;text-align:left">
+            <div style="text-align:center">
+              <svg width="48" height="48" fill="none" stroke="#f87171" stroke-width="1.8" viewBox="0 0 24 24" style="margin:0 auto 12px"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+              <h3 style="font-size:1rem;font-weight:600;margin-bottom:6px;color:#f87171">Send failed</h3>
+            </div>
+            <p id="send-result-error-stage" style="font-size:.68rem;color:#fca5a5;margin:0 0 6px;font-family:'JetBrains Mono',monospace"></p>
+            <div id="send-result-error-msg" style="font-size:.78rem;color:#fecaca;line-height:1.55;margin-bottom:10px;padding:10px 12px;background:rgba(239,68,68,0.12);border:1px solid rgba(239,68,68,0.25);border-radius:8px;word-break:break-word;white-space:pre-wrap;min-height:2.5em"></div>
+            <label style="display:block;font-size:.65rem;color:var(--text-dim);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">Debug details (copy for support)</label>
+            <textarea id="send-result-error-debug" readonly spellcheck="false" style="width:100%;min-height:120px;max-height:200px;background:var(--surface-2);border:1px solid var(--border);border-radius:8px;padding:10px 12px;color:var(--text-mid);font-family:'JetBrains Mono',monospace;font-size:.62rem;line-height:1.45;resize:vertical;margin-bottom:10px"></textarea>
+            <div style="display:flex;gap:8px">
+              <button type="button" id="send-copy-debug" class="action-btn" style="flex:1">Copy debug</button>
+              <button id="send-retry" class="action-btn primary" style="flex:1">Back to form</button>
+            </div>
           </div>
         </div>
 
@@ -528,11 +536,11 @@ footer p{font-size:.65rem;color:var(--text-dim)}
 <script src="js/lws-client.js"></script>
 <script src="js/mymonero-core/MyMoneroCoreCpp_WASM.js"></script>
 <script src="js/mymonero-loader.js"></script>
-<script src="js/monero-send.js?v=sendwasm1"></script>
+<script src="js/monero-send.js?v=senddebug1"></script>
 <script src="js/monero-english-wordlist.js"></script>
 <script src="js/monero-rpc.js?v=rpcfix1"></script>
 
-<script src="js/dashboard-page.js?v=sendwasm1"></script>
+<script src="js/dashboard-page.js?v=senddebug1"></script>
 <script src="js/swap-popup.js" defer></script>
 </body>
 </html>

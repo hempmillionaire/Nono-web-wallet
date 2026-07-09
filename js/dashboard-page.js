@@ -1085,8 +1085,62 @@ document.addEventListener('DOMContentLoaded', async () => {
   function sendShowResultState (state) {
     ['pending', 'success', 'error'].forEach(s => {
       const el = document.getElementById('send-result-' + s);
-      if (el) el.style.display = (s === state) ? '' : 'none';
+      if (el) el.style.display = (s === state) ? 'block' : 'none';
     });
+  }
+
+  function sendErrorMessage (e) {
+    if (!e) return 'Unknown error (no exception object)';
+    if (typeof e === 'number') return 'WASM native exception code ' + e;
+    if (typeof e === 'string') return e;
+    if (e.message) return String(e.message);
+    try { return JSON.stringify(e); } catch (x) { return String(e); }
+  }
+
+  function buildSendFailureDebug (e, preview) {
+    var signer = (typeof MoneroSend !== 'undefined' && MoneroSend.signerStatus)
+      ? MoneroSend.signerStatus()
+      : { loaded: typeof MoneroCore !== 'undefined' && MoneroCore.isLoaded && MoneroCore.isLoaded() };
+    var payload = {
+      at: new Date().toISOString(),
+      stage: (e && e.stage) || (e && e.sendDebug && e.sendDebug.stage) || 'unknown',
+      message: sendErrorMessage(e),
+      stack: (e && e.stack) || null,
+      signer: signer,
+      feeEstimate: preview ? {
+        fee_atomic: preview.fee_atomic,
+        fee_xmr: preview.fee_xmr,
+        per_byte: preview.per_byte,
+        unspent_count: preview._unspentResp && preview._unspentResp.outputs
+          ? preview._unspentResp.outputs.length : null,
+      } : null,
+      txConstruction: (e && e.sendDebug) || null,
+      sendTrace: (typeof MoneroSend !== 'undefined' && MoneroSend.getLastSendTrace)
+        ? MoneroSend.getLastSendTrace() : null,
+    };
+    return payload;
+  }
+
+  function showSendFailure (e, preview) {
+    var msg = sendErrorMessage(e);
+    var dbg = buildSendFailureDebug(e, preview);
+    var stage = dbg.stage || 'unknown';
+    console.error('[dashboard] send failed — message:', msg);
+    console.error('[dashboard] send failed — stack:', e && e.stack);
+    console.error('[dashboard] send failed — debug:', dbg);
+    var stageEl = document.getElementById('send-result-error-stage');
+    var msgEl = document.getElementById('send-result-error-msg');
+    var dbgEl = document.getElementById('send-result-error-debug');
+    if (stageEl) stageEl.textContent = 'Failed at stage: ' + stage;
+    if (msgEl) msgEl.textContent = msg;
+    if (dbgEl) {
+      try {
+        dbgEl.value = JSON.stringify(dbg, null, 2);
+      } catch (serErr) {
+        dbgEl.value = msg + '\n\n(serialize error: ' + serErr.message + ')';
+      }
+    }
+    sendShowResultState('error');
   }
   function sendResetForm () {
     sendPreview = null;
@@ -1228,9 +1282,22 @@ document.addEventListener('DOMContentLoaded', async () => {
       // Trigger a balance refresh so the new pending tx shows up
       if (typeof pollBalanceOnce === 'function') setTimeout(pollBalanceOnce, 2000);
     } catch (e) {
-      console.error('[dashboard] send failed:', e);
-      document.getElementById('send-result-error-msg').textContent = e.message || 'Unknown error';
-      sendShowResultState('error');
+      showSendFailure(e, sendPreview);
+    }
+  });
+
+  document.getElementById('send-copy-debug').addEventListener('click', () => {
+    var dbgEl = document.getElementById('send-result-error-debug');
+    var text = dbgEl ? dbgEl.value : '';
+    if (!text) return;
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(function () {
+        var btn = document.getElementById('send-copy-debug');
+        if (btn) { var prev = btn.textContent; btn.textContent = 'Copied'; setTimeout(function () { btn.textContent = prev; }, 1500); }
+      }).catch(function () { alert(text); });
+    } else {
+      dbgEl.select();
+      try { document.execCommand('copy'); } catch (x) { alert(text); }
     }
   });
 

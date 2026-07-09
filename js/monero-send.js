@@ -21,6 +21,58 @@ const MoneroSend = (function () {
 
   const DEFAULT_MIXIN = 15;
 
+  var _sendTrace = { stage: 'init', events: [] };
+
+  function traceSend (stage, data) {
+    _sendTrace.stage = stage;
+    _sendTrace.events.push({ t: new Date().toISOString(), stage: stage, data: data || null });
+    if (_sendTrace.events.length > 30) _sendTrace.events.shift();
+    console.log('[monero-send]', stage, data || '');
+  }
+
+  function signerStatus () {
+    var loaded = typeof MoneroCore !== 'undefined' && MoneroCore.isLoaded && MoneroCore.isLoaded();
+    var err = null;
+    if (typeof MoneroCore !== 'undefined' && MoneroCore.loadError) {
+      err = MoneroCore.loadError();
+    }
+    return { loaded: !!loaded, loadError: err };
+  }
+
+  function wasmExceptionMessage (e) {
+    if (typeof e === 'number') {
+      try {
+        var mod = MoneroCore._getModule ? MoneroCore._getModule() : null;
+        if (mod && mod.UTF8ToString) {
+          var s = mod.UTF8ToString(e);
+          if (s) return s;
+        }
+      } catch (x) {}
+      return 'WASM native exception (code ' + e + ')';
+    }
+    if (e && e.message) return e.message;
+    return String(e);
+  }
+
+  function failSend (stage, message, extra) {
+    var dbg = {
+      stage: stage,
+      message: message,
+      signer: signerStatus(),
+      trace: _sendTrace.events.slice(),
+      extra: extra || {},
+    };
+    var err = new Error(message);
+    err.stage = stage;
+    err.sendDebug = dbg;
+    console.error('[monero-send] FAIL @' + stage, message, dbg);
+    throw err;
+  }
+
+  function getLastSendTrace () {
+    return _sendTrace;
+  }
+
   function atomicMultiplierFor (networkId) {
     if (typeof Networks !== 'undefined') {
       return Networks.atomicMultiplier(networkId || 'nono-mainnet');
@@ -123,11 +175,14 @@ const MoneroSend = (function () {
   // ── Send transaction ──────────────────────────────────────────────
 
   async function send (walletKeys, toAddress, xmrAmount, priority, paymentId, preview) {
+    _sendTrace = { stage: 'init', events: [] };
+    traceSend('start', { to: (toAddress || '').slice(0, 12) + '…', amount: xmrAmount, priority: priority });
+
     try {
       await MoneroCore.load();
+      traceSend('signer_load', signerStatus());
     } catch (e) {
-      var detail = (e && e.message) ? e.message : String(e);
-      throw new Error('Transaction signing requires a component that could not load (' + detail + '). Try a hard refresh; if it persists, disable strict ad blockers for this site.');
+      failSend('signer_load', 'Transaction signing requires a component that could not load (' + wasmExceptionMessage(e) + ').', { loadException: wasmExceptionMessage(e) });
     }
 
     var amountAtomic = BigInt(xmrToAtomic(xmrAmount, networkIdFromKeys(walletKeys)));
@@ -141,14 +196,25 @@ const MoneroSend = (function () {
     // (typically 2–10 ring members, 2017–2021 era) are perfectly spendable in
     // modern transactions — they just look "underspendable" to LWS's filter.
     // Passing mixin=0 bypasses that filter so we see every output.
-    var unspentResp = await LwsClient.getUnspentOuts(
-      walletKeys.address, walletKeys.privateViewKeyHex,
-      '0', 0, true
-    );
+    var unspentResp;
+    try {
+      unspentResp = await LwsClient.getUnspentOuts(
+        walletKeys.address, walletKeys.privateViewKeyHex,
+        '0', 0, true
+      );
+      traceSend('unspent_fetch', {
+        outputCount: unspentResp && unspentResp.outputs ? unspentResp.outputs.length : 0,
+        per_kb_fee: unspentResp && unspentResp.per_kb_fee,
+      });
+    } catch (e) {
+      failSend('unspent_fetch', 'Failed to fetch spendable outputs: ' + wasmExceptionMessage(e), {});
+    }
 
     if (!unspentResp || !Array.isArray(unspentResp.outputs) || unspentResp.outputs.length === 0) {
-      throw new Error('No spendable outputs found (LWS returned ' +
-        (unspentResp ? (unspentResp.outputs ? unspentResp.outputs.length : 'no outputs field') : 'null') + ')');
+      failSend('unspent_fetch', 'No spendable outputs found (LWS returned ' +
+        (unspentResp ? (unspentResp.outputs ? unspentResp.outputs.length : 'no outputs field') : 'null') + ')', {
+        unspentResp: unspentResp ? { keys: Object.keys(unspentResp) } : null,
+      });
     }
 
     // Verify which outputs are actually spendable using key_image
@@ -215,21 +281,36 @@ const MoneroSend = (function () {
 
     if (totalAvailable < amountAtomic + BigInt(estFee)) {
       var nid = networkIdFromKeys(walletKeys);
-      var sym = (typeof Networks !== 'undefined') ? Networks.get(nid).ticker : 'XMR';
-      throw new Error('Insufficient funds: need ' +
+      var sym = (typeof Networks !== 'undefined') ? Networks.get(nid).ticker : 'NONO';
+      failSend('output_selection', 'Insufficient funds: need ' +
         atomicToXmr((amountAtomic + BigInt(estFee)).toString(), nid) +
-        ' ' + sym + ' but only have ' + atomicToXmr(totalAvailable.toString(), nid) + ' ' + sym);
+        ' ' + sym + ' but only have ' + atomicToXmr(totalAvailable.toString(), nid) + ' ' + sym, {
+        selectedOutputs: selectedOuts.length,
+        totalAvailable: totalAvailable.toString(),
+      });
     }
 
     var feeAmount = BigInt(estFee);
     var changeAmount = totalAvailable - amountAtomic - feeAmount;
 
+    traceSend('output_selection', {
+      selectedOutputs: selectedOuts.length,
+      feeAtomic: String(feeAmount),
+      changeAtomic: String(changeAmount),
+    });
+
     // 3. Fetch ring decoys
     var decoyAmounts = selectedOuts.map(function () { return '0'; });
-    var mixResp = await LwsClient.getRandomOuts(decoyAmounts, DEFAULT_MIXIN + 1);
-    if (!mixResp || !Array.isArray(mixResp.amount_outs)) {
-      throw new Error('Failed to fetch ring decoys from server');
+    var mixResp;
+    try {
+      mixResp = await LwsClient.getRandomOuts(decoyAmounts, DEFAULT_MIXIN + 1);
+    } catch (e) {
+      failSend('decoys_fetch', 'Failed to fetch ring decoys: ' + wasmExceptionMessage(e), {});
     }
+    if (!mixResp || !Array.isArray(mixResp.amount_outs)) {
+      failSend('decoys_fetch', 'Failed to fetch ring decoys from server (empty response)', { mixResp: mixResp });
+    }
+    traceSend('decoys_fetch', { rings: mixResp.amount_outs.length });
 
     // 4. Normalize output formats for WASM
     var wasmOutputs = selectedOuts.map(function (o) {
@@ -273,53 +354,57 @@ const MoneroSend = (function () {
 
     var step2Result;
     try {
+      traceSend('tx_sign', { inputs: wasmOutputs.length, mixin: DEFAULT_MIXIN });
       step2Result = MoneroCore.sendStep2(step2Params);
+      traceSend('tx_sign', {
+        ok: !!(step2Result && step2Result.serialized_signed_tx),
+        tx_hash: step2Result && step2Result.tx_hash,
+        signed_len: step2Result && step2Result.serialized_signed_tx ? step2Result.serialized_signed_tx.length : 0,
+      });
     } catch (e) {
-      var msg = 'Transaction signing failed';
-      if (typeof e === 'number') {
-        // WASM C++ exception — try to read error string
-        try {
-          var mod = MoneroCore._getModule ? MoneroCore._getModule() : null;
-          if (mod && mod.UTF8ToString) msg = mod.UTF8ToString(e) || msg;
-        } catch (x) {}
-        console.error('[send] WASM signing exception (ptr ' + e + '):', msg);
-      } else if (e && e.message) {
-        msg = e.message;
-        console.error('[send] signing error:', msg);
-      } else {
-        console.error('[send] signing error (raw):', e);
-      }
-      throw new Error(msg);
+      failSend('tx_sign', 'Transaction signing failed: ' + wasmExceptionMessage(e), {
+        step2ParamsSummary: {
+          outs: wasmOutputs.length,
+          mix: mixResp.amount_outs.length,
+          fee: String(feeAmount),
+          change: String(changeAmount),
+        },
+      });
     }
 
     if (!step2Result || !step2Result.serialized_signed_tx) {
-      console.error('[send] step2 returned:', JSON.stringify(step2Result));
-      throw new Error('Transaction signing failed — no signed output');
+      failSend('tx_sign', 'Transaction signing failed — no signed output', { step2Result: step2Result });
     }
 
     // 6. Broadcast
+    var broadcastResp;
     try {
-      var broadcastResp = await LwsClient.submitRawTx(step2Result.serialized_signed_tx);
+      broadcastResp = await LwsClient.submitRawTx(step2Result.serialized_signed_tx);
+      traceSend('broadcast', { status: broadcastResp && broadcastResp.status, error: broadcastResp && broadcastResp.error });
       if (!broadcastResp || broadcastResp.status !== 'OK') {
-        var reason = (broadcastResp && broadcastResp.error) || 'unknown';
-        throw new Error(reason);
+        var reason = (broadcastResp && broadcastResp.reason) || (broadcastResp && broadcastResp.error) || JSON.stringify(broadcastResp) || 'unknown';
+        failSend('broadcast', 'Broadcast rejected: ' + reason, { broadcastResp: broadcastResp });
       }
     } catch (bcErr) {
-      var errMsg = bcErr.message || String(bcErr);
+      if (bcErr && bcErr.stage) throw bcErr;
+      var errMsg = wasmExceptionMessage(bcErr);
+      traceSend('broadcast', { exception: errMsg });
       if (/double.spend|already.spent/i.test(errMsg)) {
-        throw new Error('Transaction rejected — an output was already spent. Wait a few minutes for confirmations and try again.');
+        failSend('broadcast', 'Transaction rejected — an output was already spent. Wait a few minutes for confirmations and try again.', { errMsg: errMsg });
       } else if (/invalid.input/i.test(errMsg)) {
-        throw new Error('Transaction rejected by the network. This can happen on some mobile browsers. Try again or use a desktop browser.');
+        failSend('broadcast', 'Transaction rejected by the network (invalid input).', { errMsg: errMsg });
       } else if (/fee.too.low/i.test(errMsg)) {
-        throw new Error('Transaction fee is too low. Try a higher priority.');
+        failSend('broadcast', 'Transaction fee is too low. Try a higher priority.', { errMsg: errMsg });
       } else if (/network|reach|timeout/i.test(errMsg)) {
-        throw new Error('Could not reach the wallet server. Check your connection and try again.');
+        failSend('broadcast', 'Could not reach the wallet server. Check your connection and try again.', { errMsg: errMsg });
       } else if (/HTTP\s*500|server.error/i.test(errMsg)) {
-        throw new Error('The wallet server rejected this transaction. Wait a few minutes and try again.');
+        failSend('broadcast', 'The wallet server rejected this transaction. Wait a few minutes and try again.', { errMsg: errMsg });
       } else {
-        throw new Error('Broadcast failed: ' + errMsg + '. Your funds have not been sent.');
+        failSend('broadcast', 'Broadcast failed: ' + errMsg + '. Your funds have not been sent.', { errMsg: errMsg });
       }
     }
+
+    traceSend('complete', { tx_hash: step2Result.tx_hash });
 
     return {
       tx_hash: step2Result.tx_hash,
@@ -328,7 +413,13 @@ const MoneroSend = (function () {
     };
   }
 
-  return { validateAddress: validateAddress, estimateFee: estimateFee, send: send };
+  return {
+    validateAddress: validateAddress,
+    estimateFee: estimateFee,
+    send: send,
+    getLastSendTrace: getLastSendTrace,
+    signerStatus: signerStatus,
+  };
 })();
 
 if (typeof module !== 'undefined' && module.exports) module.exports = MoneroSend;

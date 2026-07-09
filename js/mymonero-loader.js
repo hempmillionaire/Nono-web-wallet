@@ -163,7 +163,7 @@ const MoneroCore = (function () {
 
   function _getModule() { return _module; }
 
-  return { load, isLoaded, decodeAddress, sendStep1, sendStep2, generateKeyImage, _getModule };
+  return { load, isLoaded, loadError, decodeAddress, sendStep1, sendStep2, generateKeyImage, _getModule };
 })();
 
 if (typeof module !== 'undefined' && module.exports) module.exports = MoneroCore;
