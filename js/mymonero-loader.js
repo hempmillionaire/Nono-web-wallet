@@ -93,8 +93,16 @@ const MoneroCore = (function () {
    *   1. Build a human-readable summary ('sending 0.5 XMR + 0.0001 XMR fee')
    *   2. Decide how many decoys to fetch via LwsClient.getRandomOuts()
    */
+  function hasSendStep1 () {
+    return _module != null &&
+      typeof _module.send_step1__prepare_params_for_get_decoys === 'function';
+  }
+
   function sendStep1 (params) {
     if (!_module) throw new Error('MoneroCore not loaded');
+    if (!hasSendStep1()) {
+      throw new Error('send_step1 not exported by this WASM build — use manual tx planning');
+    }
     const required = ['is_sweeping', 'payment_id_string', 'sending_amount',
                       'priority', 'fee_per_b', 'fee_mask', 'fork_version',
                       'unspent_outs', 'nettype_string'];
@@ -184,7 +192,7 @@ const MoneroCore = (function () {
 
   function _getModule() { return _module; }
 
-  return { load, isLoaded, loadError, decodeAddress, sendStep1, sendStep2, generateKeyImage, _getModule };
+  return { load, isLoaded, loadError, hasSendStep1, decodeAddress, sendStep1, sendStep2, generateKeyImage, _getModule };
 })();
 
 if (typeof module !== 'undefined' && module.exports) module.exports = MoneroCore;

@@ -114,6 +114,39 @@ const MoneroSend = (function () {
     });
   }
 
+  function planTxManual (spendableSanitized, amountAtomic, priority, perByteFee, feeMask, networkId, np) {
+    var mult = PRIO_MULT[priority] || 4;
+    var estFee = Math.ceil(perByteFee * TYPICAL_TX_BYTES * mult);
+    if (feeMask > 0) estFee = Math.ceil(estFee / feeMask) * feeMask;
+
+    var totalAvailable = 0n;
+    var selected = [];
+    var sorted = spendableSanitized.slice().sort(function (a, b) {
+      return Number(BigInt(b.amount) - BigInt(a.amount));
+    });
+    for (var i = 0; i < sorted.length; i++) {
+      selected.push(sorted[i]);
+      totalAvailable += BigInt(sorted[i].amount);
+      if (totalAvailable >= amountAtomic + BigInt(estFee)) break;
+    }
+
+    if (totalAvailable < amountAtomic + BigInt(estFee)) {
+      var sym = (typeof Networks !== 'undefined') ? Networks.get(networkId).ticker : 'NONO';
+      throw new Error('Insufficient funds: need ' +
+        atomicToXmr((amountAtomic + BigInt(estFee)).toString(), networkId) +
+        ' ' + sym + ' but only have ' + atomicToXmr(totalAvailable.toString(), networkId) + ' ' + sym);
+    }
+
+    var feeAmt = BigInt(estFee);
+    return {
+      using_outs: selected,
+      fee_amount: String(estFee),
+      change_amount: String(totalAvailable - amountAtomic - feeAmt),
+      final_total_wo_fee: amountAtomic.toString(),
+      mixin: String(np.mixin),
+    };
+  }
+
   function validateMixRings (mixOuts, ringSize) {
     for (var i = 0; i < mixOuts.length; i++) {
       var n = (mixOuts[i].outputs || []).length;
@@ -316,21 +349,28 @@ const MoneroSend = (function () {
     var feeMask = Number(unspentResp.fee_mask || 10000);
     var sanitizedUnspent = spendableOuts.map(sanitizeSpendableOut);
 
-    // 2. WASM step1 — output selection, fee, mixin (MyMonero-native path)
+    // 2. Plan tx — WASM step1 when exported, else manual (this WASM build has step2 only)
     var step1;
+    var planSource = 'wasm';
     try {
-      step1 = MoneroCore.sendStep1({
-        is_sweeping: '0',
-        payment_id_string: paymentId || '',
-        sending_amount: amountAtomic.toString(),
-        priority: String(priority || 2),
-        fee_per_b: String(perByteFee),
-        fee_mask: String(feeMask),
-        fork_version: np.forkVersion,
-        unspent_outs: sanitizedUnspent,
-        nettype_string: np.nettype,
-      });
+      if (typeof MoneroCore.hasSendStep1 === 'function' && MoneroCore.hasSendStep1()) {
+        step1 = MoneroCore.sendStep1({
+          is_sweeping: '0',
+          payment_id_string: paymentId || '',
+          sending_amount: amountAtomic.toString(),
+          priority: String(priority || 2),
+          fee_per_b: String(perByteFee),
+          fee_mask: String(feeMask),
+          fork_version: np.forkVersion,
+          unspent_outs: sanitizedUnspent,
+          nettype_string: np.nettype,
+        });
+      } else {
+        planSource = 'manual';
+        step1 = planTxManual(sanitizedUnspent, amountAtomic, priority, perByteFee, feeMask, np.netId, np);
+      }
       traceSend('tx_plan', {
+        source: planSource,
         mixin: step1.mixin,
         fee_amount: step1.fee_amount,
         change_amount: step1.change_amount,
@@ -340,6 +380,7 @@ const MoneroSend = (function () {
       failSend('tx_plan', 'Transaction planning failed: ' + wasmExceptionMessage(e), {
         fork_version: np.forkVersion,
         spendable: sanitizedUnspent.length,
+        planSource: planSource,
       });
     }
 
