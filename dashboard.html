@@ -8,7 +8,7 @@
 <meta property="og:url" content="https://wallet.nonoprivacy.com/dashboard.html">
 <meta property="og:type" content="website">
 <meta property="og:image" content="https://wallet.nonoprivacy.com/assets/nono-logo.png">
-<link rel="preload" href="js/mymonero-core/MyMoneroCoreCpp_WASM.wasm" as="fetch" crossorigin>
+<link rel="preload" href="/js/mymonero-core/MyMoneroCoreCpp_WASM.wasm" as="fetch" crossorigin>
 <meta name="twitter:card" content="summary">
 <meta name="twitter:image" content="https://wallet.nonoprivacy.com/assets/nono-logo.png">
 <title>NONO Wallet — Dashboard</title>
@@ -374,7 +374,7 @@ footer p{font-size:.65rem;color:var(--text-dim)}
   <div class="modal-overlay" id="receive-modal">
     <div class="modal">
       <div class="modal-header">
-        <h2>Receive XMR</h2>
+        <h2 id="receive-modal-title">Receive NONO</h2>
         <button class="modal-close" id="receive-close">✕</button>
       </div>
       <div class="modal-body" style="text-align:center">
@@ -386,7 +386,7 @@ footer p{font-size:.65rem;color:var(--text-dim)}
         <button class="btn-outline" id="receive-copy">Copy Address</button>
         <div class="receive-warning">
           <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
-          Only send Monero (XMR) to this address
+          Only send NONO to this address
         </div>
       </div>
     </div>
@@ -396,7 +396,7 @@ footer p{font-size:.65rem;color:var(--text-dim)}
   <div class="modal-overlay" id="send-modal">
     <div class="modal">
       <div class="modal-header">
-        <h2>Send XMR</h2>
+        <h2 id="send-modal-title">Send NONO</h2>
         <button class="modal-close" id="send-close">✕</button>
       </div>
       <div class="modal-body">
@@ -410,10 +410,10 @@ footer p{font-size:.65rem;color:var(--text-dim)}
           </div>
 
           <div style="margin-bottom:14px">
-            <label style="display:block;font-size:.72rem;color:var(--text-dim);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">Amount (XMR)</label>
+            <label id="send-amount-label" style="display:block;font-size:.72rem;color:var(--text-dim);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">Amount (NONO)</label>
             <input id="send-amount" type="text" inputmode="decimal" placeholder="0.0" autocomplete="off" style="width:100%;background:var(--surface-2);border:1px solid var(--border);border-radius:8px;padding:10px 12px;color:var(--text);font-family:'JetBrains Mono',monospace;font-size:.95rem;outline:none">
             <div style="display:flex;justify-content:space-between;font-size:.68rem;color:var(--text-dim);margin-top:6px">
-              <span>Available: <span id="send-available">—</span> XMR</span>
+              <span>Available: <span id="send-available">—</span> <span id="send-available-ticker">NONO</span></span>
               <button type="button" id="send-max" style="background:transparent;border:0;color:var(--xmr);font-size:.68rem;cursor:pointer;padding:0">Send max</button>
             </div>
           </div>
@@ -528,11 +528,11 @@ footer p{font-size:.65rem;color:var(--text-dim)}
 <script src="js/lws-client.js"></script>
 <script src="js/mymonero-core/MyMoneroCoreCpp_WASM.js"></script>
 <script src="js/mymonero-loader.js"></script>
-<script src="js/monero-send.js"></script>
+<script src="js/monero-send.js?v=sendwasm1"></script>
 <script src="js/monero-english-wordlist.js"></script>
 <script src="js/monero-rpc.js?v=rpcfix1"></script>
 
-<script src="js/dashboard-page.js?v=nono1"></script>
+<script src="js/dashboard-page.js?v=sendwasm1"></script>
 <script src="js/swap-popup.js" defer></script>
 </body>
 </html>

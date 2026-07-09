@@ -1101,6 +1101,12 @@ document.addEventListener('DOMContentLoaded', async () => {
       return;
     }
     sendResetForm();
+    var sendTitle = document.getElementById('send-modal-title');
+    var sendAmtLabel = document.getElementById('send-amount-label');
+    var sendAvailTicker = document.getElementById('send-available-ticker');
+    if (sendTitle) sendTitle.textContent = 'Send ' + netCfg.ticker;
+    if (sendAmtLabel) sendAmtLabel.textContent = 'Amount (' + netCfg.ticker + ')';
+    if (sendAvailTicker) sendAvailTicker.textContent = netCfg.ticker;
     document.getElementById('send-modal').classList.add('show');
     // Update "Available" from the latest LWS poll
     const balText = document.getElementById('balance-xmr').textContent;

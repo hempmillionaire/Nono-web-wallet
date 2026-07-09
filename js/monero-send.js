@@ -126,7 +126,8 @@ const MoneroSend = (function () {
     try {
       await MoneroCore.load();
     } catch (e) {
-      throw new Error('Transaction signing requires a component that could not load. Try disabling ad blockers or use a different browser.');
+      var detail = (e && e.message) ? e.message : String(e);
+      throw new Error('Transaction signing requires a component that could not load (' + detail + '). Try a hard refresh; if it persists, disable strict ad blockers for this site.');
     }
 
     var amountAtomic = BigInt(xmrToAtomic(xmrAmount, networkIdFromKeys(walletKeys)));
