@@ -458,7 +458,15 @@ const MoneroSend = (function () {
         signed_len: step2Result && step2Result.serialized_signed_tx ? step2Result.serialized_signed_tx.length : 0,
       });
     } catch (e) {
-      failSend('tx_sign', 'Transaction signing failed: ' + wasmExceptionMessage(e), {
+      var msg = (e && e.message) ? String(e.message) : wasmExceptionMessage(e);
+      if (msg.indexOf('sendStep2:') !== 0) {
+        msg = 'Transaction signing failed: ' + msg;
+      }
+      if (/native exception|WASM signing exception|^Transaction signing failed: [^\x20-\x7E]{0,3}$/.test(msg) ||
+          msg.indexOf('\uF000') >= 0) {
+        msg += ' — the bundled signer is likely Monero-stock WASM; NONO needs WASM built from github.com/hempmillionaire/Nono (see docs/NONO-WASM-SEND.md).';
+      }
+      failSend('tx_sign', msg, {
         step2ParamsSummary: {
           outs: wasmOutputs.length,
           mix: mixResp.amount_outs.length,

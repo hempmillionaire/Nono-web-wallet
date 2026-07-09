@@ -76,7 +76,7 @@ Covers BIP-39, Polyseed, subaddresses, NONO network prefix, vault round-trip, ad
 - [x] Nginx RPC/LWS proxies on wallet host
 - [x] Address normalization (Monero-style `4…` → `N…`)
 - [ ] README/screenshots refresh for NONO social card
-- [ ] Swap / PWA (optional)
+- [ ] **NONO-native mymonero-core WASM** for browser send ([docs/NONO-WASM-SEND.md](docs/NONO-WASM-SEND.md))
 
 ## Contributing
 
